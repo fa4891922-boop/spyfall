@@ -52,74 +52,7 @@ $("btnBackToLobby").addEventListener("click", () => show("lobby"));
 
 $("btnEndTurn").addEventListener("click", () => socket.emit("endMyTurn"));
 
-// ===== Чат =====
-$("btnChatSend").addEventListener("click", sendChat);
-$("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
-function sendChat() {
-  const text = $("chatInput").value.trim(); if (!text) return;
-  socket.emit("chatMessage", { text }); $("chatInput").value = "";
-}
-socket.on("newChatMessage", (msg) => {
-  const div = $("chatMessages"); if (!div) return;
-  const empty = div.querySelector(".chat-empty"); if (empty) empty.remove();
-  const p = document.createElement("div");
-  p.className = "chat-msg" + (msg.senderId === myId ? " mine" : "");
-  const ns = document.createElement("span"); ns.className = "chat-author"; ns.textContent = msg.senderId === myId ? "Вы" : msg.senderName;
-  const ts = document.createElement("span"); ts.className = "chat-text"; ts.textContent = msg.text;
-  p.appendChild(ns); p.appendChild(ts); div.appendChild(p); div.scrollTop = div.scrollHeight;
-});
-
-// ===== Голосовые =====
-let recording = false;
-$("btnRecord").addEventListener("click", async () => {
-  if (recording) { stopRecording(); return; }
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recording = true;
-    $("btnRecord").textContent = "⏹ Стоп"; $("btnRecord").classList.add("recording"); $("recStatus").textContent = "🔴 запись...";
-    audioChunks = [];
-    mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4" });
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
-    mediaRecorder.onstop = () => {
-      recording = false;
-      $("btnRecord").textContent = "🎙 Запись"; $("btnRecord").classList.remove("recording"); $("recStatus").textContent = "";
-      stream.getTracks().forEach((t) => t.stop());
-      if (audioChunks.length === 0) return;
-      const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result.split(",")[1];
-        socket.emit("audioMessage", { audioBase64: base64, mimeType: mediaRecorder.mimeType });
-      };
-      reader.readAsDataURL(blob);
-    };
-    mediaRecorder.start();
-    setTimeout(() => { if (recording) stopRecording(); }, 15000);
-  } catch (err) {
-    $("recStatus").textContent = "Нет доступа к микрофону";
-    recording = false;
-  }
-});
-
-function stopRecording() { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); }
-
-socket.on("newAudioMessage", (msg) => {
-  const div = $("voiceMessages"); if (!div) return;
-  const empty = div.querySelector(".chat-empty"); if (empty) empty.remove();
-  const row = document.createElement("div");
-  row.className = "voice-msg" + (msg.senderId === myId || msg.mine ? " mine" : "");
-  const nameEl = document.createElement("span");
-  nameEl.className = "voice-author";
-  nameEl.textContent = (msg.senderId === myId || msg.mine) ? "Вы" : msg.senderName;
-  const audio = document.createElement("audio");
-  audio.controls = true;
-  audio.src = `data:${msg.mimeType};base64,${msg.audioBase64}`;
-  audio.style.maxWidth = "100%";
-  row.appendChild(nameEl);
-  row.appendChild(audio);
-  div.appendChild(row);
-  div.scrollTop = div.scrollHeight;
-});
+// ===== Чат и голосовые сообщения отключены (общение в Discord) =====
 
 // ===== Комната =====
 socket.on("roomUpdate", (room) => {
@@ -150,9 +83,9 @@ socket.on("roleAssigned", (data) => {
   if (!data.isSpy) { $("locationName").textContent = data.location; $("roleName").textContent = data.role; }
   const ul = $("locationsList"); ul.innerHTML = "";
   (data.locations || []).forEach((loc) => { const li = document.createElement("li"); li.textContent = loc; ul.appendChild(li); });
-  $("chatMessages").innerHTML = '<p class="chat-empty">Сообщений пока нет...</p>';
-  $("voiceMessages").innerHTML = '<p class="chat-empty">Голосовых пока нет...</p>';
-  $("chatInput").value = "";
+  
+  
+  
   hideVotePanel(); hideSpyGuessPanel();
   $("gameHostControls").classList.toggle("hidden", !isHost);
   renderOrderList();

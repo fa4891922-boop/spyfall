@@ -215,25 +215,6 @@ io.on("connection", (socket) => {
     nextTurn(room);
   });
 
-  // ===== ГОЛОСОВЫЕ СООБЩЕНИЯ =====
-  socket.on("audioMessage", ({ audioBase64, mimeType }) => {
-    const room = rooms[currentRoom];
-    if (!room || room.state !== "playing") return;
-    const msg = { senderId: socket.id, senderName: room.players[socket.id]?.name || "Игрок", audioBase64, mimeType: mimeType || "audio/webm", time: Date.now() };
-    room.audioMessages.push(msg);
-    if (room.audioMessages.length > 50) room.audioMessages.shift();
-    socket.to(currentRoom).emit("newAudioMessage", msg);
-    socket.emit("newAudioMessage", { ...msg, mine: true });
-  });
-
-  // ===== ЧАТ =====
-  socket.on("chatMessage", ({ text }) => {
-    const room = rooms[currentRoom]; if (!room || room.state !== "playing") return;
-    const msg = { senderId: socket.id, senderName: room.players[socket.id]?.name || "Игрок", text: (text || "").slice(0, 500), time: Date.now() };
-    room.chatMessages.push(msg); if (room.chatMessages.length > 200) room.chatMessages.shift();
-    io.to(currentRoom).emit("newChatMessage", msg);
-  });
-
   // ===== ГОЛОСОВАНИЕ =====
   socket.on("initiateVote", ({ targetId }) => {
     const room = rooms[currentRoom];
