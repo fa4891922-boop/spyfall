@@ -19,15 +19,11 @@
       <div class="card">
         <label>Ваше имя</label>
         <input id="nameInput" type="text" maxlength="20" placeholder="Например, Аня" />
-
         <button id="btnCreate" class="btn btn-primary">Создать комнату</button>
-
         <div class="divider"><span>или</span></div>
-
         <label>Код комнаты</label>
         <input id="codeInput" type="text" maxlength="4" placeholder="ABCD" class="code-field" />
         <button id="btnJoin" class="btn">Присоединиться</button>
-
         <p id="homeError" class="error"></p>
       </div>
     </section>
@@ -40,10 +36,8 @@
           <span id="roomCode" class="room-code">----</span>
           <button id="btnCopy" class="btn btn-small">Копировать</button>
         </div>
-
         <h3>Игроки (<span id="playerCount">0</span>)</h3>
         <ul id="playerList" class="player-list"></ul>
-
         <div id="hostControls" class="host-controls hidden">
           <label>Длительность раунда: <span id="durationLabel">8</span> мин</label>
           <input id="durationInput" type="range" min="1" max="15" value="8" />
@@ -57,15 +51,28 @@
     <!-- Игра -->
     <section id="screen-game" class="screen">
       <div class="card">
+        <div id="phaseBanner" class="phase-banner">
+          <span id="phaseLabel">Раунд 1</span>
+        </div>
+
         <div class="timer-box">
           <span id="timer" class="timer">00:00</span>
         </div>
 
+        <!-- Баннер говорящего -->
+        <div id="turnBanner" class="turn-banner hidden">
+          <p id="turnSpeaker" class="turn-speaker">Говорит: —</p>
+          <div class="turn-bar"><div id="turnProgress" class="turn-fill"></div></div>
+          <p id="turnHint" class="hint"></p>
+          <button id="btnEndTurn" class="btn btn-small btn-primary hidden">✅ Закончить ход</button>
+        </div>
+
+        <!-- Роль -->
         <div id="roleCard" class="role-card">
           <div id="roleSpy" class="role-spy hidden">
             <div class="big-emoji">🕵️</div>
             <h2>Вы — ШПИОН!</h2>
-            <p>Не выдайте себя. Слушайте вопросы, угадайте локацию.</p>
+            <p>Не выдайте себя. Слушайте других, блефуйте.</p>
           </div>
           <div id="roleNormal" class="role-normal hidden">
             <div class="big-emoji">📍</div>
@@ -76,6 +83,12 @@
           </div>
         </div>
 
+        <!-- Порядок игроков -->
+        <div class="order-strip">
+          <span class="order-label">Порядок:</span>
+          <div id="orderList" class="order-list"></div>
+        </div>
+
         <!-- Кнопки действий -->
         <div class="action-row">
           <button id="btnVotePanel" class="btn btn-small">🗳 Голосовать</button>
@@ -84,32 +97,44 @@
 
         <!-- Панель голосования -->
         <div id="votePanel" class="vote-panel hidden">
-          <h4>Кого обвиняем?</h4>
+          <h4 id="voteTitle">Кого обвиняем?</h4>
           <div id="voteTargets" class="vote-targets"></div>
           <p id="voteStatus" class="hint hidden"></p>
           <div id="voteButtons" class="hidden">
             <p id="votePrompt">Голосуйте:</p>
             <div class="vote-actions">
-              <button id="btnVoteYes" class="btn btn-small btn-primary">Да, это шпион</button>
-              <button id="btnVoteNo" class="btn btn-small btn-danger">Нет, не шпион</button>
+              <button id="btnVoteYes" class="btn btn-small btn-primary">Да, шпион</button>
+              <button id="btnVoteNo" class="btn btn-small btn-danger">Нет</button>
             </div>
           </div>
         </div>
 
-        <!-- Панель угадывания локации -->
+        <!-- Панель угадывания -->
         <div id="spyGuessPanel" class="vote-panel hidden">
-          <h4>Какая это локация?</h4>
+          <h4>Какая локация?</h4>
           <div id="spyGuessOptions" class="spy-guess-options"></div>
           <button id="btnSpyCancelGuess" class="btn btn-small">Отмена</button>
         </div>
 
         <details class="locations-details">
-          <summary>Список всех локаций</summary>
+          <summary>Список локаций</summary>
           <ul id="locationsList" class="locations-list"></ul>
         </details>
 
         <div id="gameHostControls" class="host-controls hidden">
           <button id="btnStop" class="btn btn-danger">Завершить раунд</button>
+        </div>
+      </div>
+
+      <!-- Голосовые сообщения -->
+      <div class="card voice-card">
+        <h4>🎤 Голосовые сообщения</h4>
+        <div id="voiceMessages" class="voice-messages">
+          <p class="chat-empty">Голосовых пока нет...</p>
+        </div>
+        <div class="voice-controls">
+          <button id="btnRecord" class="btn btn-small btn-danger">🎙 Запись</button>
+          <span id="recStatus" class="rec-status"></span>
         </div>
       </div>
 
@@ -120,7 +145,7 @@
           <p class="chat-empty">Сообщений пока нет...</p>
         </div>
         <div class="chat-input-row">
-          <input id="chatInput" type="text" maxlength="500" placeholder="Ваше сообщение…" />
+          <input id="chatInput" type="text" maxlength="500" placeholder="Сообщение…" />
           <button id="btnChatSend" class="btn btn-small btn-primary">Отпр.</button>
         </div>
       </div>
@@ -133,9 +158,7 @@
         <h2 id="resultReason">Игра окончена</h2>
         <p class="result-line">Локация: <strong id="resultLocation">—</strong></p>
         <p class="result-line">Шпион: <strong id="resultSpy">—</strong></p>
-        <div id="resultVoteDetail" class="hidden">
-          <p id="resultVoteText" class="result-line"></p>
-        </div>
+        <div id="resultVoteDetail" class="hidden"><p id="resultVoteText" class="result-line"></p></div>
         <h4 style="margin-top:12px">Очки</h4>
         <ul id="resultScores" class="player-list"></ul>
         <button id="btnBackToLobby" class="btn btn-primary">В лобби</button>

@@ -1,28 +1,18 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0f1226;
-  --bg2: #171a35;
-  --card: #1e2245;
-  --accent: #5b7cfa;
-  --accent2: #8a6cff;
-  --danger: #e05260;
-  --text: #eef0ff;
-  --muted: #9aa0c4;
-  --ok: #41c98a;
-  --warn: #f0b050;
+  --bg: #0f1226; --bg2: #171a35; --card: #1e2245;
+  --accent: #5b7cfa; --accent2: #8a6cff; --danger: #e05260;
+  --text: #eef0ff; --muted: #9aa0c4; --ok: #41c98a; --warn: #f0b050;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: radial-gradient(1200px 600px at 50% -10%, var(--bg2), var(--bg));
-  color: var(--text);
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
+  color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased;
 }
 
 .app { max-width: 520px; margin: 0 auto; padding: 24px 16px 48px; }
-
 .header { text-align: center; margin-bottom: 20px; }
 .header h1 { font-size: 36px; letter-spacing: 1px; }
 .subtitle { color: var(--muted); margin-top: 4px; }
@@ -33,42 +23,24 @@ body {
 
 .card {
   background: linear-gradient(180deg, var(--card), #191c3c);
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 18px;
-  padding: 22px;
-  box-shadow: 0 12px 40px rgba(0,0,0,.35);
-  margin-bottom: 16px;
+  border: 1px solid rgba(255,255,255,.06); border-radius: 18px;
+  padding: 22px; box-shadow: 0 12px 40px rgba(0,0,0,.35); margin-bottom: 16px;
 }
 .card.center { text-align: center; }
 
 label { display: block; font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
 
 input[type=text] {
-  width: 100%;
-  background: #0f1230;
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 12px;
-  padding: 14px;
-  color: var(--text);
-  font-size: 16px;
-  outline: none;
+  width: 100%; background: #0f1230; border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px; padding: 14px; color: var(--text); font-size: 16px; outline: none;
 }
 input[type=text]:focus { border-color: var(--accent); }
-
 .code-field { text-transform: uppercase; letter-spacing: 8px; text-align: center; font-size: 24px; font-weight: 700; }
 
 .btn {
-  width: 100%;
-  margin-top: 14px;
-  padding: 14px;
-  border: none;
-  border-radius: 12px;
-  background: #2a2f5e;
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform .08s ease, filter .15s ease;
+  width: 100%; margin-top: 14px; padding: 14px; border: none; border-radius: 12px;
+  background: #2a2f5e; color: var(--text); font-size: 16px; font-weight: 600;
+  cursor: pointer; transition: transform .08s ease, filter .15s ease;
 }
 .btn:active { transform: scale(.98); }
 .btn:hover { filter: brightness(1.1); }
@@ -106,10 +78,47 @@ input[type=text]:focus { border-color: var(--accent); }
 .host-controls { margin-top: 16px; }
 input[type=range] { width: 100%; margin: 8px 0; accent-color: var(--accent); }
 
-.timer-box { text-align: center; margin-bottom: 18px; }
+/* ===== Фаза и таймер ===== */
+.phase-banner {
+  text-align: center; margin-bottom: 12px;
+}
+.phase-banner span {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  padding: 6px 20px; border-radius: 20px; font-size: 14px; font-weight: 700;
+}
+
+.timer-box { text-align: center; margin-bottom: 14px; }
 .timer { font-size: 48px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .timer.low { color: var(--danger); }
 
+/* ===== Баннер говорящего ===== */
+.turn-banner {
+  background: #141830; border: 1px solid var(--accent);
+  border-radius: 14px; padding: 14px; margin-bottom: 14px; text-align: center;
+}
+.turn-speaker { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.turn-bar {
+  width: 100%; height: 6px; background: #0f1230; border-radius: 3px; overflow: hidden; margin: 6px 0 10px;
+}
+.turn-fill {
+  height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+  width: 0%; transition: width .2s linear;
+}
+
+/* ===== Порядок игроков ===== */
+.order-strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.order-label { color: var(--muted); font-size: 12px; }
+.order-list { display: flex; gap: 4px; flex-wrap: wrap; }
+.order-chip {
+  background: #0f1230; border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px; padding: 4px 10px; font-size: 12px; color: var(--muted);
+}
+.order-chip.active {
+  border-color: var(--accent); color: var(--text); background: #1a1f45;
+  font-weight: 700; box-shadow: 0 0 8px rgba(91,124,250,.3);
+}
+
+/* ===== Роль ===== */
 .role-card { text-align: center; padding: 10px 0 6px; }
 .big-emoji { font-size: 64px; }
 .role-spy h2 { color: var(--danger); margin: 8px 0; }
@@ -118,25 +127,20 @@ input[type=range] { width: 100%; margin: 8px 0; accent-color: var(--accent); }
 .role-normal h2 { font-size: 28px; color: var(--accent); margin: 4px 0; }
 .role-normal h3 { font-size: 22px; margin: 4px 0; }
 
-/* ===== Действия и голосование ===== */
+/* ===== Действия ===== */
 .action-row { display: flex; gap: 10px; margin-top: 16px; justify-content: center; }
 .action-row .btn { flex: 1; max-width: 200px; margin-top: 0; }
 
+/* ===== Голосование ===== */
 .vote-panel {
-  background: #0f1230;
-  border-radius: 14px;
-  padding: 16px;
-  margin-top: 14px;
+  background: #0f1230; border-radius: 14px; padding: 16px; margin-top: 14px;
 }
 .vote-panel h4 { margin-bottom: 10px; font-size: 15px; }
-
 .vote-targets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .vote-target-btn { flex: 0 0 auto; }
 .guess-btn { flex: 0 0 auto; font-size: 12px; padding: 6px 10px; }
-
 .vote-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .vote-actions .btn { flex: 1; min-width: 130px; }
-
 .spy-guess-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 
 .locations-details { margin-top: 18px; background: #0f1230; border-radius: 12px; padding: 12px 14px; }
@@ -144,31 +148,31 @@ input[type=range] { width: 100%; margin: 8px 0; accent-color: var(--accent); }
 .locations-list { list-style: none; margin-top: 10px; columns: 2; column-gap: 12px; }
 .locations-list li { padding: 4px 0; font-size: 14px; }
 
+/* ===== Голосовые ===== */
+.voice-card { padding: 16px 14px; }
+.voice-card h4 { margin-bottom: 8px; font-size: 15px; }
+.voice-messages {
+  max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;
+}
+.voice-msg { background: #0f1230; border-radius: 10px; padding: 8px 12px; align-self: flex-start; max-width: 90%; }
+.voice-msg.mine { align-self: flex-end; background: #252960; }
+.voice-author { font-size: 11px; color: var(--accent); font-weight: 600; display: block; margin-bottom: 4px; }
+.voice-msg audio { width: 100%; max-width: 280px; height: 32px; }
+.voice-controls { display: flex; align-items: center; gap: 10px; }
+.voice-controls .btn { margin-top: 0; }
+.rec-status { font-size: 13px; color: var(--danger); font-weight: 600; }
+.btn.recording { background: #8b0000; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(224,82,96,.6); } 50% { box-shadow: 0 0 0 8px rgba(224,82,96,0); } }
+
 /* ===== Чат ===== */
 .chat-card { padding: 16px 14px; }
 .chat-card h4 { margin-bottom: 8px; font-size: 15px; }
-
-.chat-messages {
-  max-height: 220px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
-}
+.chat-messages { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .chat-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
-
-.chat-msg {
-  background: #0f1230;
-  border-radius: 10px;
-  padding: 8px 12px;
-  max-width: 85%;
-  align-self: flex-start;
-}
+.chat-msg { background: #0f1230; border-radius: 10px; padding: 8px 12px; max-width: 85%; align-self: flex-start; }
 .chat-msg.mine { align-self: flex-end; background: #252960; }
 .chat-author { font-size: 11px; color: var(--accent); font-weight: 600; margin-right: 6px; }
 .chat-text { font-size: 14px; word-break: break-word; }
-
 .chat-input-row { display: flex; gap: 8px; }
 .chat-input-row input { flex: 1; padding: 10px; font-size: 14px; }
 .chat-input-row .btn { padding: 10px 16px; margin-top: 0; font-size: 13px; }
