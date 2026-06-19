@@ -202,3 +202,22 @@ input[type=range] { width: 100%; margin: 8px 0; accent-color: var(--accent); }
   background-color: rgba(239, 68, 68, 0.15);
   transform: scale(1.1);
 }
+
+/* Строка смены никнейма в лобби */
+.change-name-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0 2px;
+}
+.change-name-row input {
+  flex: 1;
+  margin: 0;
+}
+.change-name-row .btn-small {
+  width: auto;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+}

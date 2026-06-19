@@ -31,7 +31,15 @@ const SPY_TOPICS = [
   "Спросите: 'Можно ли отсюда легко уйти в любой момент?'",
   "Спросите: 'Связано ли это место с какими-то поездками или путешествиями?'",
   "Спросите: 'Какое сейчас время суток в твоем понимании здесь?'",
-  "Спросите: 'Нужно ли иметь при себе документы, чтобы войти сюда?'"
+  "Спросите: 'Нужно ли иметь при себе документы, чтобы войти сюда?'",
+  "Спросите: 'Ты бы привёл сюда ребёнка или это не то место?'",
+  "Спросите: 'Если закрыть глаза, какие звуки ты бы тут услышал?'",
+  "Спросите: 'Это место связано с твоей профессией или ты тут как гость?'",
+  "Спросите: 'Что бы ты первым делом сделал, оказавшись здесь?'",
+  "Спросите: 'Здесь чаще бывает людно или почти пусто?'",
+  "Спросите: 'Тебе пришлось бы переодеться, чтобы оказаться здесь?'",
+  "Спросите: 'Это место скорее старое и историческое или современное?'",
+  "Спросите: 'Здесь принято торопиться или можно никуда не спешить?'"
 ];
 
 
@@ -106,13 +114,10 @@ function startGame(room, durationMinutes) {
 
   const playersInfo = publicPlayers(room);
 
-  // Генерируем 3 возможные локации для подсказки шпиону (1 реальная + 2 случайные)
-  const otherLocations = LOCATIONS.filter(l => l.name !== location.name);
-  const shuffledOthers = shuffle([...otherLocations]);
-  const fakeLocs = shuffledOthers.slice(0, 2).map(l => l.name);
-  const locationPossibilities = shuffle([location.name, ...fakeLocs]);
+  // ОДНА тонкая подсказка для шпиона о характере места (не раскрывает локацию прямо)
+  const locationHint = location.hint || "Внимательно слушайте других и задавайте хитрые вопросы.";
 
-  // Выбираем случайную тему-подсказку для шпиона
+  // Дополнительно: случайная идея для вопроса (помогает шпиону влиться, но не указывает на место)
   const suggestedTopic = SPY_TOPICS[Math.floor(Math.random() * SPY_TOPICS.length)];
 
   let roleIndex = 0;
@@ -126,8 +131,8 @@ function startGame(room, durationMinutes) {
         players: playersInfo, 
         durationMs: room.round.durationMs, 
         speakingOrder,
-        locationPossibilities, // подсказка по локациям
-        suggestedTopic         // подсказка по теме вопроса
+        locationHint,   // ОДНА тонкая подсказка о характере места
+        suggestedTopic  // идея для вопроса (не раскрывает место)
       });
     } else {
       const role = shuffledRoles[roleIndex % shuffledRoles.length]; roleIndex++;
@@ -319,6 +324,18 @@ io.on("connection", (socket) => {
   });
 
   
+  // ===== СМЕНА НИКНЕЙМА В ЛОББИ =====
+  socket.on("changeName", ({ name }, cb) => {
+    const room = rooms[currentRoom];
+    if (!room || !room.players[socket.id]) { if (cb) cb({ ok: false, error: "Вы не в комнате." }); return; }
+    if (room.state !== "lobby") { if (cb) cb({ ok: false, error: "Сменить ник можно только в лобби." }); return; }
+    const clean = (name || "").trim().slice(0, 20);
+    if (!clean) { if (cb) cb({ ok: false, error: "Введите непустое имя." }); return; }
+    room.players[socket.id].name = clean;
+    broadcastRoom(currentRoom);
+    if (cb) cb({ ok: true, name: clean });
+  });
+
   // ===== СИСТЕМА КИКА ИГРОКОВ (Доступна Ведущему) =====
   socket.on("kickPlayer", ({ playerId }) => {
     const room = rooms[currentRoom];

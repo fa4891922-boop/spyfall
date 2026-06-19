@@ -1,6 +1,8 @@
 /* Шпион — клиент: пошаговые раунды, голосовые сообщения, авто-голосование */
 const socket = io();
 
+const TURN_SECONDS = 30; // длительность хода одного игрока (синхронно с сервером)
+
 const $ = (id) => document.getElementById(id);
 const screens = {
   home: $("screen-home"), lobby: $("screen-lobby"), game: $("screen-game"), result: $("screen-result"),
@@ -45,6 +47,25 @@ $("btnCopy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(currentCode); $("btnCopy").textContent = "Скопировано!"; setTimeout(() => $("btnCopy").textContent = "Копировать", 1500); }
   catch (e) { prompt("Код:", currentCode); }
 });
+// Смена никнейма прямо в лобби
+function submitChangeName() {
+  const newName = $("newNameInput").value.trim();
+  $("nameChangeMsg").textContent = "";
+  if (!newName) { $("nameChangeMsg").textContent = "Введите новый ник."; return; }
+  socket.emit("changeName", { name: newName }, (res) => {
+    if (res?.ok) {
+      $("nameInput").value = res.name;
+      $("newNameInput").value = "";
+      $("nameChangeMsg").textContent = "Ник изменён ✅";
+      setTimeout(() => { $("nameChangeMsg").textContent = ""; }, 1500);
+    } else {
+      $("nameChangeMsg").textContent = res?.error || "Не удалось сменить ник.";
+    }
+  });
+}
+$("btnChangeName").addEventListener("click", submitChangeName);
+$("newNameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") submitChangeName(); });
+
 $("durationInput").addEventListener("input", (e) => { $("durationLabel").textContent = e.target.value; });
 $("btnStart").addEventListener("click", () => socket.emit("startGame", { duration: parseInt($("durationInput").value, 10) }));
 $("btnStop").addEventListener("click", () => socket.emit("stopGame"));
@@ -98,10 +119,11 @@ socket.on("roleAssigned", (data) => {
 
   // Отображение подсказки для шпиона
   if (data.isSpy) {
-    if (data.locationPossibilities && data.locationPossibilities.length > 0) {
-      $("spyLocationHint").innerHTML = `Возможные локации: <strong style="color: #60a5fa;">${data.locationPossibilities.join(", ")}</strong> (одна из них верная).`;
+    // ОДНА тонкая подсказка о характере места (не раскрывает локацию)
+    if (data.locationHint) {
+      $("spyLocationHint").innerHTML = `<strong style="color: #fca5a5;">${data.locationHint}</strong>`;
     } else {
-      $("spyLocationHint").textContent = "Изучите список локаций ниже и задавайте хитрые вопросы.";
+      $("spyLocationHint").textContent = "Внимательно слушайте других и задавайте хитрые вопросы.";
     }
     if (data.suggestedTopic) {
       $("spyTopicHint").textContent = `💡 Идея для вопроса: "${data.suggestedTopic}"`;
