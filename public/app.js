@@ -1,4 +1,4 @@
-/* Шпион — клиент: пошаговые раунды, голосовые сообщения, авто-голосование */
+/* Шпион — клиент: пошаговые раунды, голосование, угадывание, очки */
 const socket = io();
 
 const $ = (id) => document.getElementById(id);
@@ -9,7 +9,6 @@ const screens = {
 let myId = null, isHost = false, isSpy = false, currentCode = null;
 let gamePlayers = [], currentVote = null, speakingOrder = [];
 let currentSpeakerId = null, turnEndTimestamp = 0, turnInterval = null;
-let mediaRecorder = null, audioChunks = [];
 
 socket.on("connect", () => { myId = socket.id; });
 
@@ -52,8 +51,6 @@ $("btnBackToLobby").addEventListener("click", () => show("lobby"));
 
 $("btnEndTurn").addEventListener("click", () => socket.emit("endMyTurn"));
 
-// ===== Чат и голосовые сообщения отключены (общение в Discord) =====
-
 // ===== Комната =====
 socket.on("roomUpdate", (room) => {
   currentCode = room.code; isHost = room.hostId === myId;
@@ -83,9 +80,6 @@ socket.on("roleAssigned", (data) => {
   if (!data.isSpy) { $("locationName").textContent = data.location; $("roleName").textContent = data.role; }
   const ul = $("locationsList"); ul.innerHTML = "";
   (data.locations || []).forEach((loc) => { const li = document.createElement("li"); li.textContent = loc; ul.appendChild(li); });
-  
-  
-  
   hideVotePanel(); hideSpyGuessPanel();
   $("gameHostControls").classList.toggle("hidden", !isHost);
   renderOrderList();
@@ -115,7 +109,6 @@ socket.on("phaseChange", (data) => {
     clearTurnTimer();
     $("turnBanner").classList.add("hidden");
     $("btnEndTurn").classList.add("hidden");
-    $("turnSpeaker").textContent = "";
     openVotePanel();
   }
 });

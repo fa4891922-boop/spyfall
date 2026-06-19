@@ -1,4 +1,4 @@
-// Игра «Шпион» (Spyfall) — сервер с пошаговыми раундами говорения и авто-голосованием
+// Игра «Шпион» (Spyfall) — пошаговые раунды говорения + авто-голосование
 const express = require("express");
 const http = require("http");
 const path = require("path");
@@ -7,10 +7,10 @@ const LOCATIONS = require("./locations");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 5e6 }); // 5 MB для аудио
+const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
-const TURN_SECONDS = 30; // секунд на одного игрока
+const TURN_SECONDS = 30;
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/healthz", (req, res) => res.send("ok"));
@@ -59,9 +59,7 @@ function startGame(room, durationMinutes) {
     phase: "speaking1", roundNum: 1,
     speakingOrder, speakerIndex: 0, turnEndsAt: 0,
   };
-  room.chatMessages = [];
   room.vote = null;
-  room.audioMessages = [];
 
   const playersInfo = publicPlayers(room);
 
@@ -146,7 +144,7 @@ function endGame(room, reason, winner) {
     spyName: spy ? spy.name : "(вышел)", spyId: room.round.spyId,
     winner: winner || "spy", scores: room.scores,
   });
-  room.state = "lobby"; room.round = null; room.chatMessages = []; room.vote = null; room.audioMessages = [];
+  room.state = "lobby"; room.round = null; room.vote = null;
   broadcastRoom(room.code);
 }
 
@@ -175,7 +173,7 @@ io.on("connection", (socket) => {
 
   socket.on("createRoom", ({ name }, cb) => {
     const code = genRoomCode();
-    rooms[code] = { code, hostId: socket.id, players: {}, order: [], state: "lobby", round: null, timerInterval: null, chatMessages: [], vote: null, scores: {}, audioMessages: [] };
+    rooms[code] = { code, hostId: socket.id, players: {}, order: [], state: "lobby", round: null, timerInterval: null, vote: null, scores: {} };
     joinRoom(code, name);
     if (cb) cb({ ok: true, code });
   });
@@ -215,7 +213,6 @@ io.on("connection", (socket) => {
     nextTurn(room);
   });
 
-  // ===== ГОЛОСОВАНИЕ =====
   socket.on("initiateVote", ({ targetId }) => {
     const room = rooms[currentRoom];
     if (!room || room.state !== "playing" || room.vote) return;
@@ -241,7 +238,6 @@ io.on("connection", (socket) => {
     if (allVoted) resolveVote(room);
   });
 
-  // ===== ШПИОН УГАДЫВАЕТ =====
   socket.on("spyGuess", ({ locationName }) => {
     const room = rooms[currentRoom]; if (!room || room.state !== "playing" || !room.round) return;
     if (socket.id !== room.round.spyId) return;
