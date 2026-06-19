@@ -1,17 +1,17 @@
 {
-  "name": "spyfall-web-game",
+  "name": "spyfall",
   "version": "1.0.0",
-  "description": "Multiplayer Spyfall-style web game with React frontend and Socket.IO backend",
-  "main": "index.js",
+  "description": "Игра Шпион (Spyfall) — многопользовательская браузерная игра на Node.js + Socket.IO",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "socket.io": "^4.7.5"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "license": "MIT"
 }
