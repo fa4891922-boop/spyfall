@@ -1,4 +1,4 @@
-/* Шпион — клиент: пошаговые раунды, голосование, угадывание, очки */
+/* Шпион — клиент: пошаговые раунды, голосовые сообщения, авто-голосование */
 const socket = io();
 
 const $ = (id) => document.getElementById(id);
@@ -9,6 +9,7 @@ const screens = {
 let myId = null, isHost = false, isSpy = false, currentCode = null;
 let gamePlayers = [], currentVote = null, speakingOrder = [];
 let currentSpeakerId = null, turnEndTimestamp = 0, turnInterval = null;
+let mediaRecorder = null, audioChunks = [];
 
 socket.on("connect", () => { myId = socket.id; });
 
@@ -51,6 +52,8 @@ $("btnBackToLobby").addEventListener("click", () => show("lobby"));
 
 $("btnEndTurn").addEventListener("click", () => socket.emit("endMyTurn"));
 
+// ===== Чат и голосовые сообщения отключены (общение в Discord) =====
+
 // ===== Комната =====
 socket.on("roomUpdate", (room) => {
   currentCode = room.code; isHost = room.hostId === myId;
@@ -63,6 +66,22 @@ socket.on("roomUpdate", (room) => {
     li.appendChild(dot); li.appendChild(name);
     if (p.isHost) { const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "ВЕДУЩИЙ"; li.appendChild(tag); }
     if (p.score) { const sc = document.createElement("span"); sc.className = "score"; sc.textContent = p.score + " очк."; li.appendChild(sc); }
+
+    // Система кика игроков для Ведущего
+    if (isHost && p.id !== myId) {
+      const kickBtn = document.createElement("button");
+      kickBtn.className = "btn-kick";
+      kickBtn.innerHTML = "❌";
+      kickBtn.title = "Кикнуть игрока";
+      kickBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (confirm(`Вы уверены, что хотите кикнуть игрока ${p.name}?`)) {
+          socket.emit("kickPlayer", { playerId: p.id });
+        }
+      };
+      li.appendChild(kickBtn);
+    }
+
     list.appendChild(li);
   });
   $("hostControls").classList.toggle("hidden", !isHost);
@@ -76,10 +95,30 @@ socket.on("roleAssigned", (data) => {
   isSpy = data.isSpy; gamePlayers = data.players || []; speakingOrder = data.speakingOrder || [];
   $("roleSpy").classList.toggle("hidden", !data.isSpy);
   $("roleNormal").classList.toggle("hidden", data.isSpy);
+
+  // Отображение подсказки для шпиона
+  if (data.isSpy) {
+    if (data.locationPossibilities && data.locationPossibilities.length > 0) {
+      $("spyLocationHint").innerHTML = `Возможные локации: <strong style="color: #60a5fa;">${data.locationPossibilities.join(", ")}</strong> (одна из них верная).`;
+    } else {
+      $("spyLocationHint").textContent = "Изучите список локаций ниже и задавайте хитрые вопросы.";
+    }
+    if (data.suggestedTopic) {
+      $("spyTopicHint").textContent = `💡 Идея для вопроса: "${data.suggestedTopic}"`;
+    } else {
+      $("spyTopicHint").textContent = "";
+    }
+    $("spyHintBox").style.display = "block";
+  } else {
+    $("spyHintBox").style.display = "none";
+  }
   $("btnSpyGuess").classList.toggle("hidden", !data.isSpy);
   if (!data.isSpy) { $("locationName").textContent = data.location; $("roleName").textContent = data.role; }
   const ul = $("locationsList"); ul.innerHTML = "";
   (data.locations || []).forEach((loc) => { const li = document.createElement("li"); li.textContent = loc; ul.appendChild(li); });
+  
+  
+  
   hideVotePanel(); hideSpyGuessPanel();
   $("gameHostControls").classList.toggle("hidden", !isHost);
   renderOrderList();
@@ -109,6 +148,7 @@ socket.on("phaseChange", (data) => {
     clearTurnTimer();
     $("turnBanner").classList.add("hidden");
     $("btnEndTurn").classList.add("hidden");
+    $("turnSpeaker").textContent = "";
     openVotePanel();
   }
 });
@@ -237,3 +277,9 @@ socket.on("gameEnded", (data) => {
 // ===== Ошибки =====
 socket.on("errorMsg", (msg) => { $("lobbyError").textContent = msg; setTimeout(() => $("lobbyError").textContent = "", 4000); });
 socket.on("disconnect", () => { $("homeError").textContent = ""; });
+
+socket.on("kicked", () => {
+  currentCode = null;
+  show("home");
+  $("homeError").textContent = "Вы были кикнуты из комнаты.";
+});

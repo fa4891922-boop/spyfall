@@ -73,6 +73,12 @@
             <div class="big-emoji">🕵️</div>
             <h2>Вы — ШПИОН!</h2>
             <p>Не выдайте себя. Слушайте других, блефуйте.</p>
+            <!-- Блок подсказки для шпиона -->
+            <div id="spyHintBox" class="spy-hint-box" style="margin-top: 15px; padding: 12px; background-color: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; border-radius: 6px; text-align: left; font-size: 0.9em; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+              <p style="margin: 0 0 6px 0; font-weight: bold; color: #f87171; display: flex; align-items: center; gap: 6px;">💡 Подсказка для шпиона:</p>
+              <p id="spyLocationHint" style="margin: 0 0 6px 0; color: #e2e8f0; line-height: 1.4;"></p>
+              <p id="spyTopicHint" style="margin: 0; color: #94a3b8; font-style: italic; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px;"></p>
+            </div>
           </div>
           <div id="roleNormal" class="role-normal hidden">
             <div class="big-emoji">📍</div>
@@ -124,6 +130,12 @@
         <div id="gameHostControls" class="host-controls hidden">
           <button id="btnStop" class="btn btn-danger">Завершить раунд</button>
         </div>
+      </div>
+
+      <!-- Дискорд-заглушка -->
+      <div class="card discord-card" style="text-align: center; padding: 20px;">
+        <h4>💬 Общение</h4>
+        <p style="margin-top: 10px; color: #94a3b8;">Голосовой чат и обсуждение проходят в Discord.</p>
       </div>
     </section>
 
