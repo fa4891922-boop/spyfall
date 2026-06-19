@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Находка для шпиона</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React 18 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone (JSX в браузере) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Socket.IO Client -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <style>
+    html, body { background-color: #0f172a; color: #e2e8f0; margin: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           -webkit-tap-highlight-color: transparent; }
+    @keyframes pulseRed { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+    .pulse-red { animation: pulseRed 1s infinite; }
+    .glow { box-shadow: 0 0 20px rgba(239,68,68,.25); }
+    .no-select { -webkit-user-select: none; user-select: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    const DEFAULT_BACKEND_URL = "https://spyfall.onrender.com";
+    const LS_NAME = "spyfall_player_name";
+    const LS_URL  = "spyfall_backend_url";
+
+    // ---------------------------------------------------------------- helpers
+    function fmtTime(sec) {
+      const s = Math.max(0, sec | 0);
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+    }
+
+    function heatStyle(count) {
+      if (!count || count <= 0) return "border-slate-700 bg-slate-800/60";
+      if (count === 1) return "border-red-500/40 bg-slate-800/60";
+      if (count === 2) return "border-red-500/70 bg-red-900/30";
+      return "border-orange-400 bg-gradient-to-r from-red-700/60 to-orange-600/60 glow";
+    }
+
+    // ---------------------------------------------------------------- App
+    function App() {
+      const [screen, setScreen] = useState("welcome"); // welcome | lobby | game | result
+      const [connStatus, setConnStatus] = useState("disconnected");
+      const [backendUrl, setBackendUrl] = useState(localStorage.getItem(LS_URL) || DEFAULT_BACKEND_URL);
+      const [playerName, setPlayerName] = useState(localStorage.getItem(LS_NAME) || "");
+      const [joinCode, setJoinCode] = useState("");
+      const [room, setRoom] = useState(null);
+      const [myRole, setMyRole] = useState(null);
+      const [timeLeft, setTimeLeft] = useState(0);
+      const [suspectCounts, setSuspectCounts] = useState({});
+      const [result, setResult] = useState(null);
+      const [error, setError] = useState(null);
+      const [showSettings, setShowSettings] = useState(false);
+      const [myId, setMyId] = useState(null);
+
+      const socketRef = useRef(null);
+
+      const myPlayer = room && myId ? room.players.find(p => p.id === myId) : null;
+      const isHost = !!(myPlayer && myPlayer.isHost);
+
+      // ----- socket setup
+      const connect = useCallback((url) => {
+        if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
+        setConnStatus("connecting");
+        const s = io(url, { transports: ["websocket", "polling"] });
+        socketRef.current = s;
+
+        s.on("connect", () => { setMyId(s.id); setConnStatus("connected"); setError(null); });
+        s.on("disconnect", () => setConnStatus("disconnected"));
+        s.on("connect_error", () => setConnStatus("error"));
+
+        s.on("error_message", (e) => setError(e.message || "Ошибка"));
+
+        s.on("room_created", ({ room }) => { setRoom(room); setScreen("lobby"); setError(null); });
+        s.on("room_joined",  ({ room }) => { setRoom(room); setScreen("lobby"); setError(null); });
+        s.on("room_updated", (r) => setRoom(r));
+
+        s.on("game_started", ({ room }) => {
+          setRoom(room);
+          setTimeLeft(room.timeLeft);
+          setResult(null);
+          setScreen("game");
+        });
+        s.on("your_role", (r) => setMyRole(r));
+        s.on("timer_tick", ({ timeLeft }) => setTimeLeft(timeLeft));
+        s.on("suspicion_heatmap", ({ suspectCounts }) => setSuspectCounts(suspectCounts || {}));
+        s.on("game_ended", ({ reason, location, spyName }) => {
+          setResult({ reason, location, spyName });
+          setMyRole(null);
+          setScreen("result");
+        });
+
+        return s;
+      }, []);
+
+      useEffect(() => { connect(backendUrl); return () => { if (socketRef.current) socketRef.current.disconnect(); };
+        // eslint-disable-next-line
+      }, []);
+
+      // ----- emitters
+      const emit = (ev, data) => { if (socketRef.current) socketRef.current.emit(ev, data); };
+
+      const handleCreate = () => {
+        const n = playerName.trim();
+        if (n.length < 1 || n.length > 15) { setError("Введите имя от 1 до 15 символов."); return; }
+        localStorage.setItem(LS_NAME, n);
+        emit("create_room", { playerName: n });
+      };
+      const handleJoin = () => {
+        const n = playerName.trim();
+        if (n.length < 1 || n.length > 15) { setError("Введите имя от 1 до 15 символов."); return; }
+        const c = joinCode.trim().toUpperCase();
+        if (!/^[A-Z]{4}$/.test(c)) { setError("Код комнаты — 4 латинские буквы."); return; }
+        localStorage.setItem(LS_NAME, n);
+        emit("join_room", { code: c, playerName: n });
+      };
+      const handleStart = () => room && emit("start_game", { code: room.code });
+      const handleEnd   = () => room && emit("end_game", { code: room.code, reason: "host_ended" });
+      const handleSuspect = (id) => {
+        if (!room || !myPlayer) return;
+        const next = myPlayer.suspectId === id ? null : id;
+        emit("update_suspicion", { code: room.code, suspectId: next });
+      };
+      const handleLeave = () => {
+        if (room) emit("leave_room", { code: room.code });
+        setRoom(null); setMyRole(null); setResult(null); setSuspectCounts({}); setScreen("welcome");
+      };
+      const saveBackend = (url) => {
+        const u = (url || "").trim() || DEFAULT_BACKEND_URL;
+        localStorage.setItem(LS_URL, u);
+        setBackendUrl(u);
+        connect(u);
+        setShowSettings(false);
+      };
+
+      // ---------------------------------------------------------------- render
+      return (
+        <div className="min-h-screen w-full flex flex-col items-center px-4 py-6">
+          <div className="w-full max-w-2xl">
+            <Header connStatus={connStatus} onSettings={() => setShowSettings(true)} />
+
+            {error && <ErrorBar message={error} onClose={() => setError(null)} />}
+
+            {screen === "welcome" && (
+              <WelcomeScreen
+                playerName={playerName} setPlayerName={setPlayerName}
+                joinCode={joinCode} setJoinCode={setJoinCode}
+                onCreate={handleCreate} onJoin={handleJoin}
+                connStatus={connStatus}
+              />
+            )}
+            {screen === "lobby" && room && (
+              <LobbyScreen room={room} isHost={isHost} onStart={handleStart} onLeave={handleLeave} />
+            )}
+            {screen === "game" && room && (
+              <GameScreen
+                room={room} myId={myId} myRole={myRole} timeLeft={timeLeft}
+                suspectCounts={suspectCounts} isHost={isHost}
+                onSuspect={handleSuspect} onEnd={handleEnd}
+                myPlayer={myPlayer}
+              />
+            )}
+            {screen === "result" && (
+              <ResultScreen result={result} isHost={isHost} onRestart={handleStart} onLeave={handleLeave} room={room} />
+            )}
+          </div>
+
+          {showSettings && (
+            <SettingsModal current={backendUrl} onSave={saveBackend} onClose={() => setShowSettings(false)} connStatus={connStatus} />
+          )}
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------- pieces
+    function Header({ connStatus, onSettings }) {
+      const map = {
+        connected:   ["bg-emerald-500", "В сети"],
+        connecting:  ["bg-amber-400 pulse-red", "Подключение…"],
+        disconnected:["bg-slate-500", "Нет связи"],
+        error:       ["bg-red-500", "Ошибка"]
+      };
+      const [dot, label] = map[connStatus] || map.disconnected;
+      return (
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🕵️</span>
+            <h1 className="text-xl font-bold tracking-tight text-red-400">Находка для шпиона</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span className={`w-2.5 h-2.5 rounded-full ${dot}`}></span>{label}
+            </span>
+            <button onClick={onSettings} className="text-slate-400 hover:text-slate-200 text-lg" title="Настройки">⚙️</button>
+          </div>
+        </div>
+      );
+    }
+
+    function ErrorBar({ message, onClose }) {
+      return (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-red-500/50 bg-red-900/30 px-4 py-2 text-sm text-red-200">
+          <span>{message}</span>
+          <button onClick={onClose} className="text-red-300 hover:text-white">✕</button>
+        </div>
+      );
+    }
+
+    function Btn({ children, onClick, disabled, variant = "primary", ...rest }) {
+      const base = "w-full rounded-xl px-4 font-semibold transition no-select flex items-center justify-center";
+      const styles = {
+        primary: "bg-red-600 hover:bg-red-500 text-white",
+        ghost:   "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700",
+        danger:  "bg-slate-800 hover:bg-red-900/50 text-red-300 border border-red-800"
+      };
+      return (
+        <button onClick={onClick} disabled={disabled}
+          style={{ minHeight: 48 }}
+          className={`${base} ${styles[variant]} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`} {...rest}>
+          {children}
+        </button>
+      );
+    }
+
+    function Card({ children, className = "" }) {
+      return <div className={`rounded-2xl border border-slate-700 bg-slate-800/50 p-5 ${className}`}>{children}</div>;
+    }
+
+    function WelcomeScreen({ playerName, setPlayerName, joinCode, setJoinCode, onCreate, onJoin, connStatus }) {
+      const offline = connStatus !== "connected";
+      return (
+        <div className="space-y-5">
+          <p className="text-center text-slate-400 text-sm">Найди шпиона до окончания времени</p>
+
+          {offline && (
+            <Card className="text-center text-sm text-amber-300">
+              Подключаемся к серверу… Если сервер просыпается, это может занять до 60 секунд.
+            </Card>
+          )}
+
+          <Card>
+            <label className="block text-xs text-slate-400 mb-1">Ваше имя</label>
+            <input value={playerName} maxLength={15}
+              onChange={e => setPlayerName(e.target.value)}
+              placeholder="Ваше имя"
+              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-3 text-slate-100 outline-none focus:border-red-500" />
+
+            <div className="mt-4">
+              <Btn onClick={onCreate} disabled={offline}>Создать новую игру</Btn>
+            </div>
+
+            <div className="my-4 flex items-center gap-3 text-xs text-slate-500">
+              <div className="h-px flex-1 bg-slate-700"></div>или<div className="h-px flex-1 bg-slate-700"></div>
+            </div>
+
+            <label className="block text-xs text-slate-400 mb-1">Код комнаты</label>
+            <input value={joinCode} maxLength={4}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="ABCD"
+              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-3 text-center text-2xl tracking-[0.4em] font-bold text-slate-100 outline-none focus:border-red-500" />
+            <div className="mt-4">
+              <Btn onClick={onJoin} variant="ghost" disabled={offline}>Войти в лобби</Btn>
+            </div>
+          </Card>
+        </div>
+      );
+    }
+
+    function LobbyScreen({ room, isHost, onStart, onLeave }) {
+      const canStart = room.players.length >= 3;
+      return (
+        <div className="space-y-5">
+          <Card className="text-center">
+            <div className="text-xs uppercase tracking-widest text-slate-400">Код комнаты</div>
+            <div className="text-5xl font-black tracking-[0.3em] text-red-400 my-2">{room.code}</div>
+            <div className="text-sm text-slate-400">Покажите этот код друзьям</div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-slate-200">Игроки</h2>
+              <span className="text-sm text-slate-400">{room.players.length} / 12</span>
+            </div>
+            <ul className="space-y-2">
+              {room.players.map(p => (
+                <li key={p.id} className="flex items-center gap-2 rounded-lg bg-slate-900/60 px-3 py-2">
+                  <span className="text-slate-100">{p.name}</span>
+                  {p.isHost && <span title="Хост">👑</span>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {isHost ? (
+            <Btn onClick={onStart} disabled={!canStart}>
+              {canStart ? "Запустить игру" : "Нужно минимум 3 игрока"}
+            </Btn>
+          ) : (
+            <Card className="text-center text-slate-400 text-sm">Ожидаем, пока хост запустит игру…</Card>
+          )}
+
+          <Btn onClick={onLeave} variant="danger">Покинуть комнату</Btn>
+        </div>
+      );
+    }
+
+    function RoleCard({ myRole }) {
+      const [revealed, setRevealed] = useState(false);
+      const show = () => setRevealed(true);
+      const hide = () => setRevealed(false);
+      return (
+        <Card className="text-center">
+          {revealed && myRole ? (
+            <div className="py-2">
+              <div className={`text-2xl font-black ${myRole.isSpy ? "text-red-400" : "text-emerald-400"}`}>
+                {myRole.isSpy ? "Вы шпион 🕵️" : "Вы местный"}
+              </div>
+              <div className="mt-2 text-slate-300">Локация: <span className="font-bold text-slate-100">{myRole.location}</span></div>
+            </div>
+          ) : (
+            <div className="py-2 text-slate-500">Роль скрыта</div>
+          )}
+          <button
+            onMouseDown={show} onMouseUp={hide} onMouseLeave={hide}
+            onTouchStart={(e)=>{e.preventDefault();show();}} onTouchEnd={hide}
+            className="mt-3 w-full rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold no-select"
+            style={{ minHeight: 52 }}>
+            Удерживайте, чтобы показать роль
+          </button>
+        </Card>
+      );
+    }
+
+    function GameScreen({ room, myId, myRole, timeLeft, suspectCounts, isHost, onSuspect, onEnd, myPlayer }) {
+      const [crossed, setCrossed] = useState({});
+      const danger = timeLeft < 60;
+      const toggleLoc = (loc) => setCrossed(c => ({ ...c, [loc]: !c[loc] }));
+
+      return (
+        <div className="space-y-5">
+          {/* Таймер */}
+          <Card className="text-center">
+            <div className={`text-6xl font-black tabular-nums ${danger ? "text-red-500 pulse-red" : "text-slate-100"}`}>
+              {fmtTime(timeLeft)}
+            </div>
+          </Card>
+
+          {/* Роль */}
+          <RoleCard myRole={myRole} />
+
+          {/* Игроки + подозрения */}
+          <Card>
+            <h2 className="font-semibold text-slate-200 mb-1">Подозрения</h2>
+            <p className="text-xs text-slate-500 mb-3">Тапните по игроку, чтобы подозревать. Повторный тап снимает подозрение.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {room.players.map(p => {
+                const isMe = p.id === myId;
+                const count = suspectCounts[p.id] || 0;
+                const selected = myPlayer && myPlayer.suspectId === p.id;
+                return (
+                  <button key={p.id} disabled={isMe}
+                    onClick={() => onSuspect(p.id)}
+                    className={`rounded-xl border px-3 py-3 text-left transition ${heatStyle(count)} ${isMe ? "opacity-50 cursor-not-allowed" : "hover:border-slate-400"} ${selected ? "ring-2 ring-red-400" : ""}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-100 text-sm truncate">{p.name}{p.isHost ? " 👑" : ""}{isMe ? " (вы)" : ""}</span>
+                      {count > 0 && <span className="text-xs text-red-300 font-bold">{count}</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Список локаций */}
+          <Card>
+            <h2 className="font-semibold text-slate-200 mb-1">Локации</h2>
+            <p className="text-xs text-slate-500 mb-3">Тапните, чтобы вычеркнуть исключённые места (видно только вам).</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {room.locationsList.map(loc => (
+                <button key={loc} onClick={() => toggleLoc(loc)}
+                  className={`rounded-lg px-2 py-2 text-xs text-left border border-slate-700 bg-slate-900/40 ${crossed[loc] ? "line-through opacity-40" : "text-slate-200"}`}>
+                  {loc}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {isHost && <Btn onClick={onEnd} variant="danger">Завершить раунд</Btn>}
+        </div>
+      );
+    }
+
+    function ResultScreen({ result, isHost, onRestart, onLeave }) {
+      const reasons = {
+        host_ended: "Раунд завершён хостом",
+        time_up: "Время вышло",
+        spy_found: "Шпион найден",
+        spy_left: "Шпион покинул игру",
+        not_enough_players: "Недостаточно игроков для продолжения",
+        server_reset: "Сервер был перезапущен"
+      };
+      return (
+        <div className="space-y-5">
+          <Card className="text-center">
+            <div className="text-xs uppercase tracking-widest text-slate-400">Раунд окончен</div>
+            <div className="text-2xl font-bold text-red-400 my-2">{result ? (reasons[result.reason] || result.reason) : ""}</div>
+            {result && (
+              <div className="mt-3 space-y-1 text-slate-300">
+                <div>Локация: <span className="font-bold text-slate-100">{result.location || "—"}</span></div>
+                <div>Шпион: <span className="font-bold text-red-300">{result.spyName || "—"}</span></div>
+              </div>
+            )}
+          </Card>
+
+          {isHost ? (
+            <Btn onClick={onRestart}>Начать новый раунд</Btn>
+          ) : (
+            <Card className="text-center text-slate-400 text-sm">Ожидаем, пока хост начнёт новый раунд…</Card>
+          )}
+          <Btn onClick={onLeave} variant="danger">Выйти</Btn>
+        </div>
+      );
+    }
+
+    function SettingsModal({ current, onSave, onClose, connStatus }) {
+      const [url, setUrl] = useState(current);
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={onClose}>
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-slate-100 mb-1">Настройки сервера</h2>
+            <p className="text-xs text-slate-500 mb-3">Статус: {connStatus}</p>
+            <label className="block text-xs text-slate-400 mb-1">URL бэкенда</label>
+            <input value={url} onChange={e => setUrl(e.target.value)}
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-3 text-slate-100 outline-none focus:border-red-500" />
+            <div className="mt-4 space-y-2">
+              <Btn onClick={() => onSave(url)}>Сохранить</Btn>
+              <Btn onClick={() => onSave(DEFAULT_BACKEND_URL)} variant="ghost">Сбросить по умолчанию</Btn>
+              <Btn onClick={onClose} variant="danger">Закрыть</Btn>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
