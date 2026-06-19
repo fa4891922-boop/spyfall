@@ -297,10 +297,11 @@ io.on("connection", (socket) => {
     io.to(currentRoom).emit("voteStarted", { initiatorId: socket.id, initiatorName: room.players[socket.id].name, targetId, targetName: room.players[targetId].name, yes: [], no: [] });
   });
 
-  // Отмена голосования — доступна в любой момент любому игроку, сколько угодно раз.
+  // Отмена голосования — доступна в любой момент, но ТОЛЬКО тому, кто его начал.
   socket.on("cancelVote", () => {
     const room = rooms[currentRoom];
     if (!room || !room.vote) return;
+    if (room.vote.initiatorId !== socket.id) return; // отменить может только инициатор
     const byName = room.players[socket.id]?.name || "Игрок";
     room.vote = null;
     io.to(currentRoom).emit("voteCancelled", { byId: socket.id, byName });

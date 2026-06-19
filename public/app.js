@@ -244,7 +244,7 @@ socket.on("voteStarted", (data) => {
   $("voteStatus").textContent = `${data.initiatorName} обвиняет ${data.targetName}!`;
   $("votePrompt").textContent = data.targetId === myId ? "Вы под обвинением." : "Голосуйте:";
   $("voteButtons").classList.toggle("hidden", data.targetId === myId);
-  $("btnVoteCancel").classList.remove("hidden"); // отменить можно в любой момент
+  $("btnVoteCancel").classList.toggle("hidden", data.initiatorId !== myId); // отменить может только инициатор
   $("votePanel").classList.remove("hidden");
 });
 socket.on("voteUpdate", (data) => {
