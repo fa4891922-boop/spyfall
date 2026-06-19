@@ -230,6 +230,7 @@ function openVotePanel() {
   });
   $("voteStatus").classList.add("hidden");
   $("voteButtons").classList.add("hidden");
+  $("btnVoteCancel").classList.add("hidden");
   $("votePrompt").textContent = "Выберите, кого обвинить:";
   $("votePanel").classList.remove("hidden");
 }
@@ -243,6 +244,7 @@ socket.on("voteStarted", (data) => {
   $("voteStatus").textContent = `${data.initiatorName} обвиняет ${data.targetName}!`;
   $("votePrompt").textContent = data.targetId === myId ? "Вы под обвинением." : "Голосуйте:";
   $("voteButtons").classList.toggle("hidden", data.targetId === myId);
+  $("btnVoteCancel").classList.remove("hidden"); // отменить можно в любой момент
   $("votePanel").classList.remove("hidden");
 });
 socket.on("voteUpdate", (data) => {
@@ -252,6 +254,7 @@ socket.on("voteUpdate", (data) => {
 });
 socket.on("voteResult", (data) => {
   hideVotePanel();
+  $("btnVoteCancel").classList.add("hidden");
   if (data.passed) {
     $("resultVoteDetail").classList.remove("hidden");
     $("resultVoteText").textContent = data.isSpy ? `Шпион найден: ${data.targetName}!` : `Невиновный: ${data.targetName}.`;
@@ -260,6 +263,21 @@ socket.on("voteResult", (data) => {
 });
 $("btnVoteYes").addEventListener("click", () => socket.emit("castVote", { vote: "yes" }));
 $("btnVoteNo").addEventListener("click", () => socket.emit("castVote", { vote: "no" }));
+
+// Отмена голосования — в любой момент
+$("btnVoteCancel").addEventListener("click", () => socket.emit("cancelVote"));
+socket.on("voteCancelled", (data) => {
+  currentVote = null;
+  $("btnVoteCancel").classList.add("hidden");
+  $("voteButtons").classList.add("hidden");
+  // Возвращаем панель к выбору цели, чтобы можно было сразу начать заново
+  if (!$("votePanel").classList.contains("hidden")) {
+    openVotePanel();
+  }
+  $("voteStatus").classList.remove("hidden");
+  $("voteStatus").textContent = `Голосование отменено (${data?.byName || "игрок"}).`;
+  setTimeout(() => { if ($("voteStatus")) $("voteStatus").classList.add("hidden"); }, 2500);
+});
 
 // ===== Шпион угадывает =====
 $("btnSpyGuess").addEventListener("click", () => {

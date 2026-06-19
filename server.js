@@ -78,24 +78,44 @@ function broadcastRoom(code) {
 function shuffle(arr) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 function clearRoomTimer(room) {
-  if (room.timerInterval) { clearInterval(room.timerInterval); room.timerInterval = null; }
+  if (room.timerInterval) { clearTimeout(room.timerInterval); room.timerInterval = null; }
 }
 
 function startGame(room, durationMinutes) {
   const playerIds = room.order.filter((id) => room.players[id] && room.players[id].connected);
   if (playerIds.length < 3) { io.to(room.hostId).emit("errorMsg", "Нужно минимум 3 игрока."); return; }
 
-  // Улучшенный рандом: исключаем последние 15 локаций из истории, чтобы избежать частых повторов
-  if (!room.locationHistory) room.locationHistory = [];
-  let availableLocations = LOCATIONS.filter(l => !room.locationHistory.includes(l.name));
-  if (availableLocations.length === 0) {
-    availableLocations = LOCATIONS; // Сброс истории, если прошли весь список
-    room.locationHistory = [];
+  // ===== Умный анти-повтор локаций =====
+  // Правило: локация, выпавшая 2 раза, уходит "на отдых" на 3 игры. Плюс не повторяемся подряд.
+  if (!room.locationCooldown) room.locationCooldown = {}; // name -> сколько игр ещё заблокирована
+  if (!room.locationUses) room.locationUses = {};         // name -> счётчик использований до кулдауна
+  if (!room.recentLocations) room.recentLocations = [];   // недавно выпавшие (избегаем повторов подряд)
+
+  // В начале каждой игры уменьшаем все кулдауны на 1
+  for (const name of Object.keys(room.locationCooldown)) {
+    room.locationCooldown[name] -= 1;
+    if (room.locationCooldown[name] <= 0) delete room.locationCooldown[name];
   }
-  const location = availableLocations[Math.floor(Math.random() * availableLocations.length)];
-  room.locationHistory.push(location.name);
-  if (room.locationHistory.length > 15) {
-    room.locationHistory.shift();
+
+  // Доступные локации: без активного кулдауна
+  let pool = LOCATIONS.filter((l) => !room.locationCooldown[l.name]);
+  if (pool.length === 0) pool = LOCATIONS.slice(); // страховка
+
+  // Дополнительно избегаем самых недавних, чтобы не выпадало подряд
+  const avoidCount = Math.min(6, Math.max(1, Math.floor(pool.length / 3)));
+  const avoid = new Set(room.recentLocations.slice(-avoidCount));
+  const fresh = pool.filter((l) => !avoid.has(l.name));
+  if (fresh.length > 0) pool = fresh;
+
+  const location = pool[Math.floor(Math.random() * pool.length)];
+
+  // Обновляем статистику
+  room.recentLocations.push(location.name);
+  if (room.recentLocations.length > 12) room.recentLocations.shift();
+  room.locationUses[location.name] = (room.locationUses[location.name] || 0) + 1;
+  if (room.locationUses[location.name] >= 2) {
+    room.locationCooldown[location.name] = 3; // отдыхает 3 игры
+    room.locationUses[location.name] = 0;
   }
   const spyId = playerIds[Math.floor(Math.random() * playerIds.length)];
   const shuffledRoles = shuffle(location.roles);
@@ -182,16 +202,14 @@ function startTurn(room) {
     roundNum: room.round.roundNum, turnEndsAt,
   });
 
-  room.timerInterval = setInterval(() => {
-    const remaining = Math.max(0, turnEndsAt - Date.now());
-    io.to(room.code).emit("turnTimerTick", { remaining, speakerId });
-    if (remaining <= 0) {
-      clearRoomTimer(room);
-      io.to(room.code).emit("turnEnded", { speakerId, speakerName });
-      room.round.speakerIndex++;
-      setTimeout(() => startTurn(room), 1500);
-    }
-  }, 500);
+  // Оптимизация: один таймер на ход вместо рассылки тиков каждые 500 мс.
+  // Клиент сам отрисовывает обратный отсчёт по turnEndsAt.
+  room.timerInterval = setTimeout(() => {
+    room.timerInterval = null;
+    io.to(room.code).emit("turnEnded", { speakerId, speakerName });
+    room.round.speakerIndex++;
+    setTimeout(() => startTurn(room), 1500);
+  }, TURN_SECONDS * 1000);
 }
 
 function nextTurn(room) {
@@ -248,7 +266,7 @@ io.on("connection", (socket) => {
 
   socket.on("createRoom", ({ name }, cb) => {
     const code = genRoomCode();
-    rooms[code] = { code, hostId: socket.id, players: {}, order: [], state: "lobby", round: null, timerInterval: null, chatMessages: [], vote: null, scores: {}, audioMessages: [], locationHistory: [] };
+    rooms[code] = { code, hostId: socket.id, players: {}, order: [], state: "lobby", round: null, timerInterval: null, chatMessages: [], vote: null, scores: {}, audioMessages: [], locationCooldown: {}, locationUses: {}, recentLocations: [] };
     joinRoom(code, name);
     if (cb) cb({ ok: true, code });
   });
@@ -289,12 +307,22 @@ io.on("connection", (socket) => {
   });
 
   // ===== ГОЛОСОВАНИЕ =====
+  // Можно начинать в любой момент игры, сколько угодно раз. Новое голосование заменяет текущее.
   socket.on("initiateVote", ({ targetId }) => {
     const room = rooms[currentRoom];
-    if (!room || room.state !== "playing" || room.vote) return;
+    if (!room || room.state !== "playing") return;
     if (targetId === socket.id || !room.players[targetId]?.connected) return;
     room.vote = { initiatorId: socket.id, targetId, yes: [], no: [] };
     io.to(currentRoom).emit("voteStarted", { initiatorId: socket.id, initiatorName: room.players[socket.id].name, targetId, targetName: room.players[targetId].name, yes: [], no: [] });
+  });
+
+  // Отмена голосования — доступна в любой момент любому игроку, сколько угодно раз.
+  socket.on("cancelVote", () => {
+    const room = rooms[currentRoom];
+    if (!room || !room.vote) return;
+    const byName = room.players[socket.id]?.name || "Игрок";
+    room.vote = null;
+    io.to(currentRoom).emit("voteCancelled", { byId: socket.id, byName });
   });
 
   socket.on("castVote", ({ vote: v }) => {
