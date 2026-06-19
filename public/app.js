@@ -10,6 +10,7 @@ const screens = {
 
 let myId = null, isHost = false, isSpy = false, currentCode = null;
 let gamePlayers = [], currentVote = null, speakingOrder = [];
+let allLocations = [];
 let currentSpeakerId = null, turnEndTimestamp = 0, turnInterval = null;
 let mediaRecorder = null, audioChunks = [];
 
@@ -136,8 +137,9 @@ socket.on("roleAssigned", (data) => {
   }
   $("btnSpyGuess").classList.toggle("hidden", !data.isSpy);
   if (!data.isSpy) { $("locationName").textContent = data.location; $("roleName").textContent = data.role; }
-  const ul = $("locationsList"); ul.innerHTML = "";
-  (data.locations || []).forEach((loc) => { const li = document.createElement("li"); li.textContent = loc; ul.appendChild(li); });
+  allLocations = data.locations || [];
+  $("locSearch").value = "";
+  renderLocationsList("");
   
   
   
@@ -264,14 +266,34 @@ $("btnSpyGuess").addEventListener("click", () => {
   $("spyGuessPanel").classList.contains("hidden") ? openSpyGuessPanel() : hideSpyGuessPanel();
 });
 function openSpyGuessPanel() {
+  $("spyGuessSearch").value = "";
+  renderSpyGuessOptions("");
+  $("spyGuessPanel").classList.remove("hidden");
+  setTimeout(() => $("spyGuessSearch").focus(), 50);
+}
+function renderSpyGuessOptions(filter) {
   const div = $("spyGuessOptions"); div.innerHTML = "";
-  $("locationsList").querySelectorAll("li").forEach((li) => {
-    const btn = document.createElement("button"); btn.className = "btn btn-small guess-btn"; btn.textContent = li.textContent;
-    btn.addEventListener("click", () => socket.emit("spyGuess", { locationName: li.textContent }));
+  const q = (filter || "").trim().toLowerCase();
+  const matches = allLocations.filter((loc) => loc.toLowerCase().includes(q));
+  matches.forEach((loc) => {
+    const btn = document.createElement("button");
+    btn.className = "btn btn-small guess-btn"; btn.textContent = loc;
+    btn.addEventListener("click", () => socket.emit("spyGuess", { locationName: loc }));
     div.appendChild(btn);
   });
-  $("spyGuessPanel").classList.remove("hidden");
+  $("spyGuessEmpty").classList.toggle("hidden", matches.length > 0);
 }
+$("spyGuessSearch").addEventListener("input", (e) => renderSpyGuessOptions(e.target.value));
+
+// Поиск по общему списку локаций
+function renderLocationsList(filter) {
+  const ul = $("locationsList"); ul.innerHTML = "";
+  const q = (filter || "").trim().toLowerCase();
+  const matches = allLocations.filter((loc) => loc.toLowerCase().includes(q));
+  matches.forEach((loc) => { const li = document.createElement("li"); li.textContent = loc; ul.appendChild(li); });
+  $("locListEmpty").classList.toggle("hidden", matches.length > 0);
+}
+$("locSearch").addEventListener("input", (e) => renderLocationsList(e.target.value));
 function hideSpyGuessPanel() { $("spyGuessPanel").classList.add("hidden"); }
 $("btnSpyCancelGuess").addEventListener("click", hideSpyGuessPanel);
 

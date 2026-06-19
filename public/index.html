@@ -124,13 +124,17 @@
         <!-- Панель угадывания -->
         <div id="spyGuessPanel" class="vote-panel hidden">
           <h4>Какая локация?</h4>
+          <input id="spyGuessSearch" type="text" placeholder="🔎 Введите название..." class="loc-search" autocomplete="off" />
           <div id="spyGuessOptions" class="spy-guess-options"></div>
+          <p id="spyGuessEmpty" class="hint hidden">Ничего не найдено.</p>
           <button id="btnSpyCancelGuess" class="btn btn-small">Отмена</button>
         </div>
 
         <details class="locations-details">
           <summary>Список локаций</summary>
+          <input id="locSearch" type="text" placeholder="🔎 Поиск локации..." class="loc-search" autocomplete="off" />
           <ul id="locationsList" class="locations-list"></ul>
+          <p id="locListEmpty" class="hint hidden">Ничего не найдено.</p>
         </details>
 
         <div id="gameHostControls" class="host-controls hidden">

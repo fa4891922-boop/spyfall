@@ -221,3 +221,19 @@ input[type=range] { width: 100%; margin: 8px 0; accent-color: var(--accent); }
   padding: 8px 14px;
   font-size: 13px;
 }
+
+/* Поле поиска по локациям (шпион) */
+.loc-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #2a2f5a;
+  background: #0f1230;
+  color: #e2e8f0;
+  font-size: 15px;
+  outline: none;
+}
+.loc-search:focus { border-color: var(--accent, #ef4444); }
+.loc-search::placeholder { color: #6b7280; }
