@@ -1,4 +1,5 @@
 // Игра «Шпион» (Spyfall) — сервер на Node.js + Express + Socket.IO
+// Полная механика: чат, голосование, угадывание локации шпионом, подсчёт очков
 const express = require("express");
 const http = require("http");
 const path = require("path");
@@ -11,11 +12,9 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Раздача статических файлов фронтенда
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/healthz", (req, res) => res.send("ok"));
 
-// ===== Состояние игры =====
 const rooms = {};
 
 function genRoomCode() {
@@ -36,6 +35,7 @@ function publicPlayers(room) {
       name: room.players[id].name,
       connected: room.players[id].connected,
       isHost: id === room.hostId,
+      score: room.scores?.[id] || 0,
     }));
 }
 
@@ -84,6 +84,10 @@ function startGame(room, durationMinutes) {
     startedAt: Date.now(),
     durationMs: durationMinutes * 60 * 1000,
   };
+  room.chatMessages = [];
+  room.vote = null;
+
+  const playersInfo = publicPlayers(room);
 
   let roleIndex = 0;
   playerIds.forEach((id) => {
@@ -93,6 +97,7 @@ function startGame(room, durationMinutes) {
         location: null,
         role: "Шпион",
         locations: LOCATIONS.map((l) => l.name),
+        players: playersInfo,
         durationMs: room.round.durationMs,
       });
     } else {
@@ -103,6 +108,7 @@ function startGame(room, durationMinutes) {
         location: location.name,
         role,
         locations: LOCATIONS.map((l) => l.name),
+        players: playersInfo,
         durationMs: room.round.durationMs,
       });
     }
@@ -115,25 +121,77 @@ function startGame(room, durationMinutes) {
     io.to(room.code).emit("timerTick", { remaining });
     if (remaining <= 0) {
       clearRoomTimer(room);
-      endGame(room, "Время вышло!");
+      endGame(room, "Время вышло! Шпион победил.", "spy");
     }
   }, 1000);
 
   broadcastRoom(room.code);
 }
 
-function endGame(room, reason) {
+function endGame(room, reason, winner) {
   if (!room.round) return;
   clearRoomTimer(room);
   const spy = room.players[room.round.spyId];
+
+  if (!room.scores) room.scores = {};
+  if (winner === "spy" && spy) {
+    room.scores[room.round.spyId] = (room.scores[room.round.spyId] || 0) + 2;
+  } else if (winner === "citizens") {
+    room.order.forEach((id) => {
+      if (room.players[id]?.connected && id !== room.round.spyId) {
+        room.scores[id] = (room.scores[id] || 0) + 1;
+      }
+    });
+  }
+
   io.to(room.code).emit("gameEnded", {
     reason: reason || "Игра окончена",
     locationName: room.round.locationName,
     spyName: spy ? spy.name : "(вышел)",
+    spyId: room.round.spyId,
+    winner: winner || "spy",
+    scores: room.scores,
   });
   room.state = "lobby";
   room.round = null;
+  room.chatMessages = [];
+  room.vote = null;
   broadcastRoom(room.code);
+}
+
+function resolveVote(room) {
+  const vote = room.vote;
+  if (!vote || !room.round) return;
+  const connectedPlayers = room.order.filter((id) => room.players[id]?.connected);
+  const totalVoters = connectedPlayers.filter((id) => id !== vote.targetId).length;
+  const allYes = vote.yes.length >= totalVoters && vote.no.length === 0;
+
+  room.vote = null;
+
+  if (allYes) {
+    const targetIsSpy = room.round.spyId === vote.targetId;
+    const targetName = room.players[vote.targetId]?.name || "???";
+    io.to(room.code).emit("voteResult", {
+      passed: true,
+      targetName,
+      targetId: vote.targetId,
+      isSpy: targetIsSpy,
+    });
+    if (targetIsSpy) {
+      endGame(room, `Шпион ${targetName} разоблачён голосованием!`, "citizens");
+    } else {
+      endGame(room, `Невиновный ${targetName} обвинён! Шпион победил.`, "spy");
+    }
+  } else {
+    const vt = room.players[vote.targetId]?.name || "???";
+    io.to(room.code).emit("voteResult", {
+      passed: false,
+      targetName: vt,
+      targetId: vote.targetId,
+      yesCount: vote.yes.length,
+      noCount: vote.no.length,
+    });
+  }
 }
 
 io.on("connection", (socket) => {
@@ -149,6 +207,9 @@ io.on("connection", (socket) => {
       state: "lobby",
       round: null,
       timerInterval: null,
+      chatMessages: [],
+      vote: null,
+      scores: {},
     };
     joinRoom(code, name);
     if (cb) cb({ ok: true, code });
@@ -196,9 +257,92 @@ io.on("connection", (socket) => {
 
   socket.on("stopGame", () => {
     const room = rooms[currentRoom];
-    if (!room) return;
-    if (socket.id !== room.hostId) return;
-    endGame(room, "Ведущий завершил раунд.");
+    if (!room || socket.id !== room.hostId) return;
+    endGame(room, "Ведущий завершил раунд.", "spy");
+  });
+
+  // ===== ЧАТ =====
+  socket.on("chatMessage", ({ text }) => {
+    const room = rooms[currentRoom];
+    if (!room || room.state !== "playing") return;
+    const msg = {
+      senderId: socket.id,
+      senderName: room.players[socket.id]?.name || "Игрок",
+      text: (text || "").slice(0, 500),
+      time: Date.now(),
+    };
+    room.chatMessages.push(msg);
+    if (room.chatMessages.length > 200) room.chatMessages.shift();
+    io.to(currentRoom).emit("newChatMessage", msg);
+  });
+
+  // ===== ГОЛОСОВАНИЕ =====
+  socket.on("initiateVote", ({ targetId }) => {
+    const room = rooms[currentRoom];
+    if (!room || room.state !== "playing" || room.vote) return;
+    if (targetId === socket.id) return;
+    if (!room.players[targetId]?.connected) return;
+
+    room.vote = {
+      initiatorId: socket.id,
+      targetId,
+      yes: [],
+      no: [],
+    };
+
+    io.to(currentRoom).emit("voteStarted", {
+      initiatorId: socket.id,
+      initiatorName: room.players[socket.id].name,
+      targetId,
+      targetName: room.players[targetId].name,
+      yes: [],
+      no: [],
+    });
+  });
+
+  socket.on("castVote", ({ vote: v }) => {
+    const room = rooms[currentRoom];
+    if (!room || !room.vote) return;
+    if (room.vote.yes.includes(socket.id) || room.vote.no.includes(socket.id)) return;
+    if (socket.id === room.vote.targetId) return;
+
+    if (v === "yes") room.vote.yes.push(socket.id);
+    else room.vote.no.push(socket.id);
+
+    const connectedPlayers = room.order.filter((id) => room.players[id]?.connected);
+    const voted = new Set([...room.vote.yes, ...room.vote.no]);
+    const allVoted = connectedPlayers.every(
+      (id) => id === room.vote.targetId || voted.has(id)
+    );
+
+    io.to(currentRoom).emit("voteUpdate", {
+      initiatorId: room.vote.initiatorId,
+      initiatorName: room.players[room.vote.initiatorId]?.name,
+      targetId: room.vote.targetId,
+      targetName: room.players[room.vote.targetId]?.name,
+      yesNames: room.vote.yes.map((id) => room.players[id]?.name),
+      noNames: room.vote.no.map((id) => room.players[id]?.name),
+      yes: room.vote.yes,
+      no: room.vote.no,
+    });
+
+    if (allVoted) resolveVote(room);
+  });
+
+  // ===== ШПИОН УГАДЫВАЕТ ЛОКАЦИЮ =====
+  socket.on("spyGuess", ({ locationName }) => {
+    const room = rooms[currentRoom];
+    if (!room || room.state !== "playing" || !room.round) return;
+    if (socket.id !== room.round.spyId) return;
+
+    const correct = locationName === room.round.locationName;
+    const spyName = room.players[socket.id]?.name || "Шпион";
+
+    if (correct) {
+      endGame(room, `${spyName} угадал локацию: ${locationName}!`, "spy");
+    } else {
+      endGame(room, `${spyName} ошибся! Локация была: ${room.round.locationName}.`, "citizens");
+    }
   });
 
   socket.on("disconnect", () => {

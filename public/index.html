@@ -65,7 +65,7 @@
           <div id="roleSpy" class="role-spy hidden">
             <div class="big-emoji">🕵️</div>
             <h2>Вы — ШПИОН!</h2>
-            <p>Не выдайте себя. Угадайте локацию по вопросам других игроков.</p>
+            <p>Не выдайте себя. Слушайте вопросы, угадайте локацию.</p>
           </div>
           <div id="roleNormal" class="role-normal hidden">
             <div class="big-emoji">📍</div>
@@ -74,6 +74,33 @@
             <p class="role-label">Ваша роль</p>
             <h3 id="roleName">—</h3>
           </div>
+        </div>
+
+        <!-- Кнопки действий -->
+        <div class="action-row">
+          <button id="btnVotePanel" class="btn btn-small">🗳 Голосовать</button>
+          <button id="btnSpyGuess" class="btn btn-small btn-danger hidden">🎯 Угадать локацию</button>
+        </div>
+
+        <!-- Панель голосования -->
+        <div id="votePanel" class="vote-panel hidden">
+          <h4>Кого обвиняем?</h4>
+          <div id="voteTargets" class="vote-targets"></div>
+          <p id="voteStatus" class="hint hidden"></p>
+          <div id="voteButtons" class="hidden">
+            <p id="votePrompt">Голосуйте:</p>
+            <div class="vote-actions">
+              <button id="btnVoteYes" class="btn btn-small btn-primary">Да, это шпион</button>
+              <button id="btnVoteNo" class="btn btn-small btn-danger">Нет, не шпион</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Панель угадывания локации -->
+        <div id="spyGuessPanel" class="vote-panel hidden">
+          <h4>Какая это локация?</h4>
+          <div id="spyGuessOptions" class="spy-guess-options"></div>
+          <button id="btnSpyCancelGuess" class="btn btn-small">Отмена</button>
         </div>
 
         <details class="locations-details">
@@ -85,6 +112,18 @@
           <button id="btnStop" class="btn btn-danger">Завершить раунд</button>
         </div>
       </div>
+
+      <!-- Чат -->
+      <div class="card chat-card">
+        <h4>Чат</h4>
+        <div id="chatMessages" class="chat-messages">
+          <p class="chat-empty">Сообщений пока нет...</p>
+        </div>
+        <div class="chat-input-row">
+          <input id="chatInput" type="text" maxlength="500" placeholder="Ваше сообщение…" />
+          <button id="btnChatSend" class="btn btn-small btn-primary">Отпр.</button>
+        </div>
+      </div>
     </section>
 
     <!-- Результат -->
@@ -94,6 +133,11 @@
         <h2 id="resultReason">Игра окончена</h2>
         <p class="result-line">Локация: <strong id="resultLocation">—</strong></p>
         <p class="result-line">Шпион: <strong id="resultSpy">—</strong></p>
+        <div id="resultVoteDetail" class="hidden">
+          <p id="resultVoteText" class="result-line"></p>
+        </div>
+        <h4 style="margin-top:12px">Очки</h4>
+        <ul id="resultScores" class="player-list"></ul>
         <button id="btnBackToLobby" class="btn btn-primary">В лобби</button>
       </div>
     </section>
