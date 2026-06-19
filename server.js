@@ -85,38 +85,19 @@ function startGame(room, durationMinutes) {
   const playerIds = room.order.filter((id) => room.players[id] && room.players[id].connected);
   if (playerIds.length < 3) { io.to(room.hostId).emit("errorMsg", "Нужно минимум 3 игрока."); return; }
 
-  // ===== Умный анти-повтор локаций =====
-  // Правило: локация, выпавшая 2 раза, уходит "на отдых" на 3 игры. Плюс не повторяемся подряд.
-  if (!room.locationCooldown) room.locationCooldown = {}; // name -> сколько игр ещё заблокирована
-  if (!room.locationUses) room.locationUses = {};         // name -> счётчик использований до кулдауна
-  if (!room.recentLocations) room.recentLocations = [];   // недавно выпавшие (избегаем повторов подряд)
-
-  // В начале каждой игры уменьшаем все кулдауны на 1
-  for (const name of Object.keys(room.locationCooldown)) {
-    room.locationCooldown[name] -= 1;
-    if (room.locationCooldown[name] <= 0) delete room.locationCooldown[name];
+  // ===== Локации без повторов =====
+  // Каждая локация выпадает ровно один раз за круг. Когда все пройдены — колода
+  // перемешивается заново (так, чтобы последняя локация не повторилась сразу).
+  if (!room.locationBag || room.locationBag.length === 0) {
+    let bag = shuffle(LOCATIONS.map((l) => l.name));
+    if (room.lastLocation && bag.length > 1 && bag[0] === room.lastLocation) {
+      [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
+    }
+    room.locationBag = bag;
   }
-
-  // Доступные локации: без активного кулдауна
-  let pool = LOCATIONS.filter((l) => !room.locationCooldown[l.name]);
-  if (pool.length === 0) pool = LOCATIONS.slice(); // страховка
-
-  // Дополнительно избегаем самых недавних, чтобы не выпадало подряд
-  const avoidCount = Math.min(6, Math.max(1, Math.floor(pool.length / 3)));
-  const avoid = new Set(room.recentLocations.slice(-avoidCount));
-  const fresh = pool.filter((l) => !avoid.has(l.name));
-  if (fresh.length > 0) pool = fresh;
-
-  const location = pool[Math.floor(Math.random() * pool.length)];
-
-  // Обновляем статистику
-  room.recentLocations.push(location.name);
-  if (room.recentLocations.length > 12) room.recentLocations.shift();
-  room.locationUses[location.name] = (room.locationUses[location.name] || 0) + 1;
-  if (room.locationUses[location.name] >= 2) {
-    room.locationCooldown[location.name] = 3; // отдыхает 3 игры
-    room.locationUses[location.name] = 0;
-  }
+  const locationName = room.locationBag.shift();
+  room.lastLocation = locationName;
+  const location = LOCATIONS.find((l) => l.name === locationName) || LOCATIONS[0];
   const spyId = playerIds[Math.floor(Math.random() * playerIds.length)];
   const shuffledRoles = shuffle(location.roles);
   const speakingOrder = shuffle([...playerIds]);
@@ -266,7 +247,7 @@ io.on("connection", (socket) => {
 
   socket.on("createRoom", ({ name }, cb) => {
     const code = genRoomCode();
-    rooms[code] = { code, hostId: socket.id, players: {}, order: [], state: "lobby", round: null, timerInterval: null, chatMessages: [], vote: null, scores: {}, audioMessages: [], locationCooldown: {}, locationUses: {}, recentLocations: [] };
+    rooms[code] = { code, hostId: socket.id, players: {}, order: [], state: "lobby", round: null, timerInterval: null, chatMessages: [], vote: null, scores: {}, audioMessages: [], locationBag: [], lastLocation: null };
     joinRoom(code, name);
     if (cb) cb({ ok: true, code });
   });
