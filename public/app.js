@@ -21,6 +21,20 @@ function show(name) {
   screens[name].classList.add("active");
 }
 
+// Авто-подключение по ссылке (?room=XXXX)
+(function () {
+  const params = new URLSearchParams(location.search);
+  const roomFromUrl = params.get("room");
+  if (roomFromUrl && roomFromUrl.length >= 4) {
+    $("codeInput").value = roomFromUrl.toUpperCase();
+    $("homeError").textContent = "";
+    socket.emit("joinRoom", { code: roomFromUrl.toUpperCase(), name: getName() }, (res) => {
+      if (res?.ok) { currentCode = res.code; show("lobby"); }
+      else { $("homeError").textContent = "Комната не найдена. Создайте новую или проверьте ссылку."; }
+    });
+  }
+})();
+
 function getName() { return ($("nameInput").value.trim() || "Игрок"); }
 
 // ===== Главная =====
@@ -48,6 +62,15 @@ $("btnCopy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(currentCode); $("btnCopy").textContent = "Скопировано!"; setTimeout(() => $("btnCopy").textContent = "Копировать", 1500); }
   catch (e) { prompt("Код:", currentCode); }
 });
+
+// Поделиться ссылкой
+$("btnShare").addEventListener("click", async () => {
+  const link = `${location.origin}/?room=${currentCode}`;
+  try {
+    if (navigator.share) { await navigator.share({ title: "Шпион — присоединяйся!", text: `Код комнаты: ${currentCode}`, url: link }); }
+    else { await navigator.clipboard.writeText(link); $("btnShare").textContent = "Ссылка скопирована!"; setTimeout(() => $("btnShare").textContent = "Поделиться", 1500); }
+  } catch (e) { prompt("Ссылка:", link); }
+});
 // Смена никнейма прямо в лобби
 function submitChangeName() {
   const newName = $("newNameInput").value.trim();
@@ -55,28 +78,45 @@ function submitChangeName() {
   if (!newName) { $("nameChangeMsg").textContent = "Введите новый ник."; return; }
   socket.emit("changeName", { name: newName }, (res) => {
     if (res?.ok) {
-      $("nameInput").value = res.name;
       $("newNameInput").value = "";
-      $("nameChangeMsg").textContent = "Ник изменён ✅";
-      setTimeout(() => { $("nameChangeMsg").textContent = ""; }, 1500);
+      $("nameChangeMsg").textContent = "Ник обновлён!";
+      setTimeout(() => $("nameChangeMsg").textContent = "", 2000);
     } else {
-      $("nameChangeMsg").textContent = res?.error || "Не удалось сменить ник.";
+      $("nameChangeMsg").textContent = res?.error || "Ошибка смены имени.";
     }
   });
 }
 $("btnChangeName").addEventListener("click", submitChangeName);
 $("newNameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") submitChangeName(); });
 
-$("durationInput").addEventListener("input", (e) => { $("durationLabel").textContent = e.target.value; });
-$("btnStart").addEventListener("click", () => socket.emit("startGame", { duration: parseInt($("durationInput").value, 10) }));
-$("btnStop").addEventListener("click", () => socket.emit("stopGame"));
+$("btnStart").addEventListener("click", () => {
+  const dur = parseInt($("durationSelect").value, 10) || 8;
+  socket.emit("startGame", { duration: Math.min(15, Math.max(1, dur)) });
+});
+
 $("btnBackToLobby").addEventListener("click", () => show("lobby"));
 
-$("btnEndTurn").addEventListener("click", () => socket.emit("endMyTurn"));
+// Аудио
+$("btnRecord").addEventListener("pointerdown", async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(audioChunks, { type: "audio/webm" });
+      if (blob.size > 5e6) { $("lobbyError").textContent = "Слишком большое аудио (макс. 5 MB)."; return; }
+      const reader = new FileReader();
+      reader.onload = () => socket.emit("audioMessage", { data: reader.result });
+      reader.readAsDataURL(blob);
+      stream.getTracks().forEach((t) => t.stop());
+    };
+    mediaRecorder.start();
+  } catch (e) { $("lobbyError").textContent = "Нет доступа к микрофону."; }
+});
+$("btnRecord").addEventListener("pointerup", () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); });
+$("btnRecord").addEventListener("pointerleave", () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); });
 
-// ===== Чат и голосовые сообщения отключены (общение в Discord) =====
-
-// ===== Комната =====
 socket.on("roomUpdate", (room) => {
   currentCode = room.code; isHost = room.hostId === myId;
   $("roomCode").textContent = room.code; $("playerCount").textContent = room.players.length;
@@ -88,246 +128,223 @@ socket.on("roomUpdate", (room) => {
     li.appendChild(dot); li.appendChild(name);
     if (p.isHost) { const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "ВЕДУЩИЙ"; li.appendChild(tag); }
     if (p.score) { const sc = document.createElement("span"); sc.className = "score"; sc.textContent = p.score + " очк."; li.appendChild(sc); }
-
-    // Система кика игроков для Ведущего
+    // Кнопка кика
     if (isHost && p.id !== myId) {
       const kickBtn = document.createElement("button");
-      kickBtn.className = "btn-kick";
-      kickBtn.innerHTML = "❌";
-      kickBtn.title = "Кикнуть игрока";
-      kickBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (confirm(`Вы уверены, что хотите кикнуть игрока ${p.name}?`)) {
-          socket.emit("kickPlayer", { playerId: p.id });
-        }
-      };
+      kickBtn.className = "btn btn-small btn-danger";
+      kickBtn.textContent = "Кик";
+      kickBtn.onclick = () => socket.emit("kickPlayer", { playerId: p.id });
       li.appendChild(kickBtn);
     }
-
     list.appendChild(li);
   });
-  $("hostControls").classList.toggle("hidden", !isHost);
-  $("waitMsg").classList.toggle("hidden", isHost);
-  $("gameHostControls").classList.toggle("hidden", !isHost);
+  $("btnStart").style.display = isHost ? "" : "none";
+  $("btnStart").disabled = room.players.length < 3;
 });
 
-// ===== Роль =====
+// ===== Игра =====
 socket.on("roleAssigned", (data) => {
-  show("game");
-  isSpy = data.isSpy; gamePlayers = data.players || []; speakingOrder = data.speakingOrder || [];
-  $("roleSpy").classList.toggle("hidden", !data.isSpy);
-  $("roleNormal").classList.toggle("hidden", data.isSpy);
-
-  // Отображение подсказки для шпиона
-  if (data.isSpy) {
-    // ОДНА тонкая подсказка о характере места (не раскрывает локацию)
-    if (data.locationHint) {
-      $("spyLocationHint").innerHTML = `<strong style="color: #fca5a5;">${data.locationHint}</strong>`;
-    } else {
-      $("spyLocationHint").textContent = "Внимательно слушайте других и задавайте хитрые вопросы.";
-    }
-    if (data.suggestedTopic) {
-      $("spyTopicHint").textContent = `💡 Идея для вопроса: "${data.suggestedTopic}"`;
-    } else {
-      $("spyTopicHint").textContent = "";
-    }
-    $("spyHintBox").style.display = "block";
+  isSpy = data.isSpy;
+  gamePlayers = data.players || [];
+  speakingOrder = data.speakingOrder || [];
+  $("spyCard").classList.toggle("hidden", !isSpy);
+  $("citizenCard").classList.toggle("hidden", isSpy);
+  $("btnSpyGuess").classList.toggle("hidden", !isSpy);
+  if (data.locationHint) {
+    $("spyLocationHint").innerHTML = `<strong style="color: #fca5a5;">${data.locationHint}</strong>`;
   } else {
-    $("spyHintBox").style.display = "none";
+    $("spyLocationHint").textContent = "Внимательно слушайте других и задавайте хитрые вопросы.";
   }
-  $("btnSpyGuess").classList.toggle("hidden", !data.isSpy);
+  if (data.suggestedTopic) {
+    $("spyTopic").textContent = data.suggestedTopic;
+  }
   if (!data.isSpy) { $("locationName").textContent = data.location; $("roleName").textContent = data.role; }
   allLocations = data.locations || [];
   $("locSearch").value = "";
   renderLocationsList("");
-  
-  
-  
-  hideVotePanel(); hideSpyGuessPanel();
-  $("gameHostControls").classList.toggle("hidden", !isHost);
-  renderOrderList();
-  $("phaseLabel").textContent = "Раунд 1";
-  clearTurnTimer();
-  $("turnBanner").classList.add("hidden");
-  $("btnEndTurn").classList.add("hidden");
-  $("timer").textContent = "--:--";
+  show("game");
 });
 
-function renderOrderList() {
-  const div = $("orderList"); div.innerHTML = "";
-  speakingOrder.forEach((id, i) => {
-    const name = gamePlayers.find((p) => p.id === id)?.name || "???";
-    const span = document.createElement("span");
-    span.className = "order-chip";
-    span.textContent = `${i + 1}. ${name}`;
-    span.dataset.pid = id;
-    div.appendChild(span);
-  });
+// Таймер хода
+function updateTimer() {
+  if (!turnEndTimestamp) return;
+  const left = Math.max(0, Math.ceil((turnEndTimestamp - Date.now()) / 1000));
+  $("timerDisplay").textContent = String(left);
+  $("timerDisplay").style.color = left <= 5 ? "var(--danger)" : left <= 10 ? "var(--warn)" : "";
+  if (left <= 0) { clearInterval(turnInterval); turnInterval = null; }
 }
 
-// ===== Смена фазы =====
-socket.on("phaseChange", (data) => {
-  $("phaseLabel").textContent = data.phase === "speaking1" ? "Раунд 1" : data.phase === "speaking2" ? "Раунд 2" : "ГОЛОСОВАНИЕ";
-  if (data.phase === "voting") {
-    clearTurnTimer();
-    $("turnBanner").classList.add("hidden");
-    $("btnEndTurn").classList.add("hidden");
-    $("turnSpeaker").textContent = "";
-    openVotePanel();
-  }
-});
-
-// ===== Ход игрока =====
 socket.on("turnStarted", (data) => {
   currentSpeakerId = data.speakerId;
   turnEndTimestamp = data.turnEndsAt;
-  $("turnBanner").classList.remove("hidden");
-  $("turnSpeaker").textContent = `🎤 Говорит: ${data.speakerName} (${data.speakerIndex + 1}/${data.totalSpeakers})`;
-  $("turnHint").textContent = data.speakerId === myId ? "Ваш ход! Опишите локацию." : "Слушайте внимательно.";
+  $("speakerName").textContent = data.speakerName;
+  $("speakerIndex").textContent = `${data.speakerIndex + 1}/${data.totalSpeakers}`;
+  $("roundNum").textContent = data.roundNum;
   $("btnEndTurn").classList.toggle("hidden", data.speakerId !== myId);
-  document.querySelectorAll(".order-chip").forEach((el) => { el.classList.toggle("active", el.dataset.pid === data.speakerId); });
-  startTurnTimer();
+  if (turnInterval) clearInterval(turnInterval);
+  updateTimer();
+  turnInterval = setInterval(updateTimer, 200);
 });
 
-function startTurnTimer() {
-  clearTurnTimer();
-  turnInterval = setInterval(() => {
-    if (!turnEndTimestamp) return;
-    const remaining = Math.max(0, turnEndTimestamp - Date.now());
-    const total = TURN_SECONDS * 1000;
-    const pct = Math.min(100, total > 0 ? ((total - remaining) / total) * 100 : 100);
-    $("turnProgress").style.width = `${pct}%`;
-    if (remaining <= 0) clearTurnTimer();
-  }, 200);
-}
-
-function clearTurnTimer() {
-  if (turnInterval) { clearInterval(turnInterval); turnInterval = null; }
-  $("turnProgress").style.width = "0%";
-}
-
-socket.on("turnEnded", (data) => {
-  clearTurnTimer();
+socket.on("turnEnded", () => {
   currentSpeakerId = null;
-  $("turnBanner").classList.add("hidden");
+  turnEndTimestamp = 0;
   $("btnEndTurn").classList.add("hidden");
-  document.querySelectorAll(".order-chip").forEach((el) => el.classList.remove("active"));
+  if (turnInterval) { clearInterval(turnInterval); turnInterval = null; }
+  $("timerDisplay").textContent = "—";
+  $("timerDisplay").style.color = "";
+});
+
+socket.on("phaseChange", (data) => {
+  $("phaseBanner").textContent = data.message;
+  $("phaseBanner").classList.remove("hidden");
+  setTimeout(() => $("phaseBanner").classList.add("hidden"), 4000);
+});
+
+$("btnEndTurn").addEventListener("click", () => socket.emit("endMyTurn"));
+
+// Чат
+$("btnSendChat").addEventListener("click", () => {
+  const text = $("chatInput").value.trim();
+  if (text) { socket.emit("chatMessage", { text }); $("chatInput").value = ""; }
+});
+$("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btnSendChat").click(); });
+socket.on("chatMessage", (data) => {
+  const div = document.createElement("div");
+  div.className = "chat-msg";
+  div.innerHTML = `<strong>${data.senderName}:</strong> ${data.text}`;
+  $("chatMessages").appendChild(div);
+  $("chatMessages").scrollTop = $("chatMessages").scrollHeight;
+});
+
+// Аудио в игре
+socket.on("audioMessage", (data) => {
+  const div = document.createElement("div");
+  div.className = "chat-msg";
+  div.innerHTML = `<strong>${data.senderName}:</strong> `;
+  const audio = document.createElement("audio");
+  audio.controls = true; audio.src = data.data;
+  div.appendChild(audio);
+  $("chatMessages").appendChild(div);
+  $("chatMessages").scrollTop = $("chatMessages").scrollHeight;
 });
 
 // ===== Голосование =====
 $("btnVotePanel").addEventListener("click", () => {
-  $("votePanel").classList.contains("hidden") ? openVotePanel() : hideVotePanel();
+  $("votePanel").classList.toggle("hidden");
+  if (!$("votePanel").classList.contains("hidden")) {
+    const select = $("voteTarget");
+    select.innerHTML = "";
+    gamePlayers.forEach((p) => {
+      if (p.id !== myId && p.connected) {
+        const opt = document.createElement("option");
+        opt.value = p.id; opt.textContent = p.name;
+        select.appendChild(opt);
+      }
+    });
+  }
 });
 
-function openVotePanel() {
-  const targetsDiv = $("voteTargets"); targetsDiv.innerHTML = "";
-  gamePlayers.forEach((p) => {
-    if (p.id === myId) return;
-    const btn = document.createElement("button");
-    btn.className = "btn btn-small vote-target-btn"; btn.textContent = p.name;
-    btn.addEventListener("click", () => socket.emit("initiateVote", { targetId: p.id }));
-    targetsDiv.appendChild(btn);
-  });
-  $("voteStatus").classList.add("hidden");
-  $("voteButtons").classList.add("hidden");
-  $("btnVoteCancel").classList.add("hidden");
-  $("votePrompt").textContent = "Выберите, кого обвинить:";
-  $("votePanel").classList.remove("hidden");
-}
+$("btnVoteYes").addEventListener("click", () => {
+  const targetId = $("voteTarget").value;
+  if (targetId) { socket.emit("initiateVote", { targetId }); $("votePanel").classList.add("hidden"); }
+});
 
-function hideVotePanel() { $("votePanel").classList.add("hidden"); }
+$("btnVoteCancel").addEventListener("click", () => socket.emit("cancelVote"));
 
 socket.on("voteStarted", (data) => {
   currentVote = data;
-  $("voteTargets").innerHTML = "";
   $("voteStatus").classList.remove("hidden");
-  $("voteStatus").textContent = `${data.initiatorName} обвиняет ${data.targetName}!`;
-  $("votePrompt").textContent = data.targetId === myId ? "Вы под обвинением." : "Голосуйте:";
-  $("voteButtons").classList.toggle("hidden", data.targetId === myId);
-  $("btnVoteCancel").classList.toggle("hidden", data.initiatorId !== myId); // отменить может только инициатор
-  $("votePanel").classList.remove("hidden");
+  $("voteStatusText").textContent = `${data.initiatorName} обвиняет ${data.targetName}!`;
+  $("btnVoteCancel").classList.toggle("hidden", data.initiatorId !== myId);
+  $("voteYesCount").textContent = "0";
+  $("voteNoCount").textContent = "0";
 });
+
 socket.on("voteUpdate", (data) => {
   currentVote = data;
-  $("voteStatus").textContent = `За: ${data.yesNames?.length || 0}, Против: ${data.noNames?.length || 0}`;
-  if (data.targetId === myId) $("voteButtons").classList.add("hidden");
+  $("voteYesCount").textContent = data.yes.length;
+  $("voteNoCount").textContent = data.no.length;
+  $("btnVoteCancel").classList.toggle("hidden", data.initiatorId !== myId);
 });
-socket.on("voteResult", (data) => {
-  hideVotePanel();
-  $("btnVoteCancel").classList.add("hidden");
-  if (data.passed) {
-    $("resultVoteDetail").classList.remove("hidden");
-    $("resultVoteText").textContent = data.isSpy ? `Шпион найден: ${data.targetName}!` : `Невиновный: ${data.targetName}.`;
-  }
-  currentVote = null;
-});
-$("btnVoteYes").addEventListener("click", () => socket.emit("castVote", { vote: "yes" }));
-$("btnVoteNo").addEventListener("click", () => socket.emit("castVote", { vote: "no" }));
 
-// Отмена голосования — в любой момент
-$("btnVoteCancel").addEventListener("click", () => socket.emit("cancelVote"));
 socket.on("voteCancelled", (data) => {
   currentVote = null;
+  $("voteStatus").classList.add("hidden");
   $("btnVoteCancel").classList.add("hidden");
-  $("voteButtons").classList.add("hidden");
-  // Возвращаем панель к выбору цели, чтобы можно было сразу начать заново
-  if (!$("votePanel").classList.contains("hidden")) {
-    openVotePanel();
-  }
-  $("voteStatus").classList.remove("hidden");
-  $("voteStatus").textContent = `Голосование отменено (${data?.byName || "игрок"}).`;
-  setTimeout(() => { if ($("voteStatus")) $("voteStatus").classList.add("hidden"); }, 2500);
 });
+
+socket.on("voteResult", (data) => {
+  currentVote = null;
+  $("voteStatus").classList.add("hidden");
+  $("btnVoteCancel").classList.add("hidden");
+});
+
+function hideVotePanel() {
+  $("votePanel").classList.add("hidden");
+  $("voteStatus").classList.add("hidden");
+}
 
 // ===== Шпион угадывает =====
 $("btnSpyGuess").addEventListener("click", () => {
-  $("spyGuessPanel").classList.contains("hidden") ? openSpyGuessPanel() : hideSpyGuessPanel();
+  $("spyGuessPanel").classList.toggle("hidden");
+  if (!$("spyGuessPanel").classList.contains("hidden")) {
+    $("spyGuessSearch").value = "";
+    renderSpyGuessOptions("");
+    setTimeout(() => $("spyGuessSearch").focus(), 50);
+  }
 });
-function openSpyGuessPanel() {
-  $("spyGuessSearch").value = "";
-  renderSpyGuessOptions("");
-  $("spyGuessPanel").classList.remove("hidden");
-  setTimeout(() => $("spyGuessSearch").focus(), 50);
-}
+
 function renderSpyGuessOptions(filter) {
-  const div = $("spyGuessOptions"); div.innerHTML = "";
-  const q = (filter || "").trim().toLowerCase();
+  const q = (filter || "").toLowerCase();
+  const ul = $("spyGuessList"); ul.innerHTML = "";
   const matches = allLocations.filter((loc) => loc.toLowerCase().includes(q));
   matches.forEach((loc) => {
+    const li = document.createElement("li");
+    li.textContent = loc;
     const btn = document.createElement("button");
-    btn.className = "btn btn-small guess-btn"; btn.textContent = loc;
+    btn.className = "btn btn-small btn-primary";
+    btn.textContent = "Выбрать";
     btn.addEventListener("click", () => socket.emit("spyGuess", { locationName: loc }));
-    div.appendChild(btn);
+    li.appendChild(btn);
+    ul.appendChild(li);
   });
-  $("spyGuessEmpty").classList.toggle("hidden", matches.length > 0);
 }
 $("spyGuessSearch").addEventListener("input", (e) => renderSpyGuessOptions(e.target.value));
+$("btnSpyCancelGuess").addEventListener("click", () => { $("spyGuessPanel").classList.add("hidden"); });
 
-// Поиск по общему списку локаций
+function hideSpyGuessPanel() { $("spyGuessPanel").classList.add("hidden"); }
+
 function renderLocationsList(filter) {
   const ul = $("locationsList"); ul.innerHTML = "";
-  const q = (filter || "").trim().toLowerCase();
+  const q = (filter || "").toLowerCase();
   const matches = allLocations.filter((loc) => loc.toLowerCase().includes(q));
   matches.forEach((loc) => { const li = document.createElement("li"); li.textContent = loc; ul.appendChild(li); });
-  $("locListEmpty").classList.toggle("hidden", matches.length > 0);
 }
 $("locSearch").addEventListener("input", (e) => renderLocationsList(e.target.value));
-function hideSpyGuessPanel() { $("spyGuessPanel").classList.add("hidden"); }
-$("btnSpyCancelGuess").addEventListener("click", hideSpyGuessPanel);
 
-// ===== Конец игры =====
+// ===== Завершение игры =====
+$("btnStop").addEventListener("click", () => socket.emit("stopGame"));
+
 socket.on("gameEnded", (data) => {
-  clearTurnTimer();
   $("resultReason").textContent = data.reason || "Игра окончена";
   $("resultLocation").textContent = data.locationName || "—";
   $("resultSpy").textContent = data.spyName || "—";
-  const scores = data.scores || {};
+  if (data.winner === "spy") {
+    $("resultVoteDetail").classList.remove("hidden");
+    $("resultVoteText").textContent = "Шпион победил!";
+  } else if (data.winner === "citizens") {
+    $("resultVoteDetail").classList.remove("hidden");
+    $("resultVoteText").textContent = "Местные победили!";
+  } else {
+    $("resultVoteDetail").classList.add("hidden");
+  }
   const scoresList = $("resultScores"); scoresList.innerHTML = "";
-  if (Object.keys(scores).length > 0) {
-    const entries = Object.entries(scores).map(([id, score]) => ({ id, name: gamePlayers.find((p) => p.id === id)?.name || "Игрок", score })).sort((a, b) => b.score - a.score);
-    entries.forEach((e) => {
+  if (data.scores && Object.keys(data.scores).length > 0) {
+    Object.entries(data.scores).forEach(([id, s]) => {
+      const p = gamePlayers.find((pl) => pl.id === id);
       const li = document.createElement("li");
-      li.textContent = `${e.score === entries[0].score && e.score > 0 ? "🥇 " : ""}${e.name}: ${e.score} очк.`;
+      li.textContent = `${p?.name || "Игрок"}: ${s} очк.`;
       scoresList.appendChild(li);
     });
   } else {
