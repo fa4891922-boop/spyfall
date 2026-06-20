@@ -1,0 +1,19 @@
+{
+  "detective": {
+    "id": "detective",
+    "name": { "ru": "Детектив", "en": "Detective" },
+    "description": {
+      "ru": "Вы — не шпион. Вы знаете локацию и видите ещё несколько вариантов, среди которых она спрятана. Помогите вычислить шпиона.",
+      "en": "You are not the spy. You know the location and see a few decoys it is hidden among. Help expose the spy."
+    },
+    "decoys": 2
+  },
+  "spyPartner": {
+    "id": "spyPartner",
+    "name": { "ru": "Напарник шпиона", "en": "Spy's Partner" },
+    "description": {
+      "ru": "Вы помогаете шпиону! Вы знаете, кто шпион, но НЕ знаете локацию. Не выдайте друг друга.",
+      "en": "You help the spy! You know who the spy is, but you do NOT know the location. Don't give each other away."
+    }
+  }
+}

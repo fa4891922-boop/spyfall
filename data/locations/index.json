@@ -1,0 +1,9 @@
+{
+  "sets": [
+    { "id": "classic",     "file": "classic.json",     "title": { "ru": "Классический", "en": "Classic" } },
+    { "id": "cities",      "file": "cities.json",      "title": { "ru": "Города",       "en": "Cities" } },
+    { "id": "movies",      "file": "movies.json",      "title": { "ru": "Фильмы",       "en": "Movies" } },
+    { "id": "history",     "file": "history.json",     "title": { "ru": "История",      "en": "History" } },
+    { "id": "professions", "file": "professions.json", "title": { "ru": "Профессии",    "en": "Professions" } }
+  ]
+}

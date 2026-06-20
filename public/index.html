@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f1226" />
   <title>Шпион — онлайн игра</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>" />
@@ -10,20 +11,25 @@
 <body>
   <div class="app">
     <header class="header">
-      <h1>🕵️ Шпион</h1>
-      <p class="subtitle">Найди шпиона среди своих!</p>
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang="ru">RU</button>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+      <h1 data-i18n="app.title">🕵️ Шпион</h1>
+      <p class="subtitle" data-i18n="app.subtitle">Найди шпиона среди своих!</p>
     </header>
 
     <!-- Экран входа -->
     <section id="screen-home" class="screen active">
       <div class="card">
-        <label>Ваше имя</label>
-        <input id="nameInput" type="text" maxlength="20" placeholder="Например, Аня" />
-        <button id="btnCreate" class="btn btn-primary">Создать комнату</button>
-        <div class="divider"><span>или</span></div>
-        <label>Код комнаты</label>
+        <label data-i18n="home.yourName">Ваше имя</label>
+        <input id="nameInput" type="text" maxlength="20" data-i18n-attr="placeholder:home.namePlaceholder" placeholder="Например, Аня" />
+        <button id="btnCreate" class="btn btn-primary" data-i18n="home.create">Создать комнату</button>
+        <div class="divider"><span data-i18n="home.or">или</span></div>
+        <label data-i18n="home.roomCode">Код комнаты</label>
         <input id="codeInput" type="text" maxlength="4" placeholder="ABCD" class="code-field" />
-        <button id="btnJoin" class="btn">Присоединиться</button>
+        <label class="check-row"><input id="joinAsSpectator" type="checkbox" /> <span data-i18n="lobby.spectator">Зайти как зритель</span></label>
+        <button id="btnJoin" class="btn" data-i18n="home.join">Присоединиться</button>
         <p id="homeError" class="error"></p>
       </div>
     </section>
@@ -32,38 +38,61 @@
     <section id="screen-lobby" class="screen">
       <div class="card">
         <div class="room-code-box">
-          <span class="room-code-label">Код комнаты</span>
+          <span class="room-code-label" data-i18n="lobby.roomCode">Код комнаты</span>
           <span id="roomCode" class="room-code">----</span>
-          <button id="btnCopy" class="btn btn-small">Копировать</button>
-          <button id="btnShare" class="btn btn-small">Поделиться</button>
+          <button id="btnCopy" class="btn btn-small" data-i18n="lobby.copy">Копировать</button>
+          <button id="btnShare" class="btn btn-small" data-i18n="lobby.share">Поделиться</button>
         </div>
         <div class="change-name-row">
-          <input id="newNameInput" type="text" maxlength="20" placeholder="Новый ник" />
-          <button id="btnChangeName" class="btn btn-small">Сменить ник</button>
+          <input id="newNameInput" type="text" maxlength="20" data-i18n-attr="placeholder:lobby.newNick" placeholder="Новый ник" />
+          <button id="btnChangeName" class="btn btn-small" data-i18n="lobby.changeNick">Сменить ник</button>
         </div>
         <p id="nameChangeMsg" class="hint"></p>
 
-        <h3>Игроки (<span id="playerCount">0</span>)</h3>
+        <h3><span data-i18n="lobby.players">Игроки</span> (<span id="playerCount">0</span>)</h3>
         <ul id="playerList" class="player-list"></ul>
 
-        <div class="duration-row">
-          <label>Длительность раунда (мин):</label>
-          <select id="durationSelect">
-            <option value="8" selected>8</option>
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="15">15</option>
-          </select>
+        <div class="settings-grid host-only">
+          <div class="setting">
+            <label data-i18n="lobby.roundDuration">Длительность раунда (мин):</label>
+            <select id="durationSelect">
+              <option value="8" selected>8</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="15">15</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label data-i18n="lobby.turnDuration">Время на ход (сек):</label>
+            <select id="turnSelect">
+              <option value="15">15</option>
+              <option value="30" selected>30</option>
+              <option value="45">45</option>
+              <option value="60">60</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label data-i18n="lobby.locationSet">Набор локаций:</label>
+            <select id="setSelect"></select>
+          </div>
         </div>
 
-        <button id="btnStart" class="btn btn-primary">Начать игру</button>
+        <label class="check-row host-only"><input id="specialRolesCheck" type="checkbox" /> <span data-i18n="lobby.specialRoles">Спец-роли (детектив, напарник шпиона)</span></label>
+        <label class="check-row"><input id="soundCheck" type="checkbox" checked /> <span data-i18n="lobby.sound">Звук</span></label>
+
+        <div class="lobby-actions host-only">
+          <button id="btnAddBot" class="btn btn-small" data-i18n="lobby.addBot">+ Бот</button>
+        </div>
+
+        <button id="btnStart" class="btn btn-primary" data-i18n="lobby.start">Начать игру</button>
         <p id="lobbyError" class="error"></p>
       </div>
     </section>
 
     <!-- Игра -->
     <section id="screen-game" class="screen">
-      <div id="phaseBanner" class="phase-banner hidden"></div>
+      <div id="spectatorBanner" class="phase-banner hidden" data-i18n="game.spectatorMode">👁️ Режим зрителя — вы наблюдаете</div>
+      <div id="phaseBanner" class="phase-banner hidden"><span></span></div>
 
       <!-- Таймер -->
       <div class="card timer-card">
@@ -71,89 +100,107 @@
         <div class="speaker-info">
           <span id="speakerName">—</span>
           <span id="speakerIndex" class="muted">0/0</span>
-          <span class="muted">Раунд <span id="roundNum">1</span></span>
+          <span class="muted"><span data-i18n="game.round">Раунд</span> <span id="roundNum">1</span></span>
         </div>
-        <button id="btnEndTurn" class="btn btn-small btn-primary hidden">✅ Закончить ход</button>
+        <button id="btnEndTurn" class="btn btn-small btn-primary hidden" data-i18n="game.endTurn">✅ Закончить ход</button>
       </div>
 
       <!-- Карточка роли -->
       <div class="card role-card">
-        <div id="spyCard" class="hidden">
-          <h3>🕵️ Вы — Шпион!</h3>
-          <p>Вы не знаете локацию. Слушайте других и задавайте вопросы.</p>
+        <div id="spyCard" class="hidden anim-pop">
+          <h3 data-i18n="game.youSpy">🕵️ Вы — Шпион!</h3>
+          <p data-i18n="game.spyDesc">Вы не знаете локацию. Слушайте других и задавайте вопросы.</p>
           <p id="spyLocationHint" class="hint"></p>
           <p id="spyTopic" class="hint"></p>
         </div>
-        <div id="citizenCard" class="hidden">
-          <h3>👤 Вы — Местный</h3>
-          <p>Локация: <strong id="locationName">—</strong></p>
-          <p>Роль: <strong id="roleName">—</strong></p>
+        <div id="citizenCard" class="hidden anim-pop">
+          <h3 data-i18n="game.youLocal">👤 Вы — Местный</h3>
+          <p><span data-i18n="game.location">Локация</span>: <strong id="locationName">—</strong></p>
+          <p><span data-i18n="game.role">Роль</span>: <strong id="roleName">—</strong></p>
+          <div id="specialRoleBox" class="special-role hidden"></div>
         </div>
       </div>
 
       <!-- Панель действий -->
       <div class="action-row">
-        <button id="btnVotePanel" class="btn btn-small">🗳 Голосовать</button>
-        <button id="btnSpyGuess" class="btn btn-small btn-danger hidden">🎯 Угадать локацию</button>
+        <button id="btnVotePanel" class="btn btn-small" data-i18n="game.vote">🗳 Голосовать</button>
+        <button id="btnSpyGuess" class="btn btn-small btn-danger hidden" data-i18n="game.guessLocation">🎯 Угадать локацию</button>
       </div>
 
       <!-- Голосование -->
       <div id="votePanel" class="card hidden">
-        <h4>Обвинить игрока</h4>
+        <h4 data-i18n="game.accusePlayer">Обвинить игрока</h4>
         <select id="voteTarget"></select>
         <div class="vote-btns">
-          <button id="btnVoteYes" class="btn btn-small btn-primary">Да, шпион</button>
-          <button id="btnVoteNo" class="btn btn-small btn-danger">Нет</button>
+          <button id="btnVoteYes" class="btn btn-small btn-primary" data-i18n="game.voteYes">Да, шпион</button>
         </div>
       </div>
 
       <div id="voteStatus" class="card hidden">
         <p id="voteStatusText"></p>
-        <span class="vote-count">Да: <strong id="voteYesCount">0</strong></span>
-        <span class="vote-count">Нет: <strong id="voteNoCount">0</strong></span>
-        <button id="btnVoteCancel" class="btn btn-small btn-danger hidden">✖ Отменить голосование</button>
+        <div class="vote-actions-inline">
+          <button id="btnVoteCastYes" class="btn btn-small btn-primary" data-i18n="game.voteYes">Да, шпион</button>
+          <button id="btnVoteCastNo" class="btn btn-small btn-danger" data-i18n="game.voteNo">Нет</button>
+        </div>
+        <span class="vote-count"><span data-i18n="game.voteYes">Да</span>: <strong id="voteYesCount">0</strong></span>
+        <span class="vote-count"><span data-i18n="game.voteNo">Нет</span>: <strong id="voteNoCount">0</strong></span>
+        <button id="btnVoteCancel" class="btn btn-small btn-danger hidden" data-i18n="game.cancelVote">✖ Отменить голосование</button>
       </div>
 
       <!-- Угадывание шпиона -->
       <div id="spyGuessPanel" class="card hidden">
-        <h4>Выберите локацию</h4>
-        <input id="spyGuessSearch" type="text" placeholder="Поиск локаций..." class="loc-search" />
+        <h4 data-i18n="game.chooseLocation">Выберите локацию</h4>
+        <input id="spyGuessSearch" type="text" data-i18n-attr="placeholder:game.searchLocations" placeholder="Поиск локаций..." class="loc-search" />
         <ul id="spyGuessList" class="loc-list"></ul>
-        <button id="btnSpyCancelGuess" class="btn btn-small">Отмена</button>
+        <button id="btnSpyCancelGuess" class="btn btn-small" data-i18n="game.cancel">Отмена</button>
       </div>
 
       <!-- Список локаций -->
       <div class="card">
-        <h4>Все локации</h4>
-        <input id="locSearch" type="text" placeholder="Поиск..." class="loc-search" />
+        <h4 data-i18n="game.allLocations">Все локации</h4>
+        <input id="locSearch" type="text" data-i18n-attr="placeholder:game.search" placeholder="Поиск..." class="loc-search" />
         <ul id="locationsList" class="loc-list"></ul>
       </div>
 
       <!-- Чат -->
-      <div class="card">
-        <h4>💬 Чат</h4>
+      <div class="card chat-card">
+        <h4 data-i18n="game.chat">💬 Чат</h4>
+        <div id="quickPhrases" class="quick-phrases"></div>
         <div id="chatMessages" class="chat-box"></div>
         <div class="chat-input-row">
-          <input id="chatInput" type="text" maxlength="200" placeholder="Сообщение..." />
-          <button id="btnSendChat" class="btn btn-small">Отправить</button>
+          <input id="chatInput" type="text" maxlength="200" data-i18n-attr="placeholder:game.message" placeholder="Сообщение..." />
+          <button id="btnSendChat" class="btn btn-small" data-i18n="game.send">Отправить</button>
+        </div>
+        <div class="voice-controls">
+          <button id="btnRecord" class="btn btn-small" data-i18n="game.record">🎤 Удерживайте для записи</button>
+          <span id="recStatus" class="rec-status hidden" data-i18n="game.recording">● Запись...</span>
         </div>
       </div>
 
       <!-- Кнопка остановки для хоста -->
-      <button id="btnStop" class="btn btn-danger">Завершить раунд</button>
+      <button id="btnStop" class="btn btn-danger" data-i18n="game.stopRound">Завершить раунд</button>
     </section>
 
     <!-- Результаты -->
     <section id="screen-result" class="screen">
       <div class="card">
-        <h2>Результаты раунда</h2>
+        <h2 data-i18n="result.title">Результаты раунда</h2>
         <p id="resultReason" class="result-line"></p>
-        <p>Локация: <strong id="resultLocation">—</strong></p>
-        <p>Шпион: <strong id="resultSpy">—</strong></p>
+        <p><span data-i18n="result.location">Локация</span>: <strong id="resultLocation">—</strong></p>
+        <p><span data-i18n="result.spy">Шпион</span>: <strong id="resultSpy">—</strong></p>
         <div id="resultVoteDetail" class="hidden"><p id="resultVoteText" class="result-line"></p></div>
-        <h4 style="margin-top:12px">Очки</h4>
+
+        <h4 style="margin-top:14px" data-i18n="result.rolesReveal">Кто кем был</h4>
+        <ul id="resultReveal" class="reveal-list"></ul>
+
+        <div id="resultVotesBox" class="hidden">
+          <h4 style="margin-top:12px" data-i18n="result.votes">Голоса</h4>
+          <p id="resultVotes" class="result-line"></p>
+        </div>
+
+        <h4 style="margin-top:12px" data-i18n="result.leaderboard">Таблица лидеров</h4>
         <ul id="resultScores" class="player-list"></ul>
-        <button id="btnBackToLobby" class="btn btn-primary">В лобби</button>
+        <button id="btnBackToLobby" class="btn btn-primary" data-i18n="result.backToLobby">В лобби</button>
       </div>
     </section>
   </div>
