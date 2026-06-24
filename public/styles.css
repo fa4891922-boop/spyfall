@@ -1,347 +1,282 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0f1226; --bg2: #171a35; --card: #1e2245;
-  --accent: #5b7cfa; --accent2: #8a6cff; --danger: #e05260;
-  --text: #eef0ff; --muted: #9aa0c4; --ok: #41c98a; --warn: #f0b050;
+  --bg: #0b0e1a;
+  --bg-grad-1: #11152a;
+  --bg-grad-2: #0b0e1a;
+  --card: #161b33;
+  --card-2: #1d2342;
+  --line: #2a3158;
+  --accent: #ff5c5c;       /* шпионский красный */
+  --accent-2: #ffb347;     /* янтарный */
+  --gold: #ffd76a;
+  --text: #f3f5ff;
+  --muted: #8b92bd;
+  --ok: #46d39a;
+  --danger: #ff4d6d;
+  --radius: 18px;
+  --shadow: 0 18px 50px rgba(0,0,0,.45);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background: radial-gradient(1200px 600px at 50% -10%, var(--bg2), var(--bg));
-  color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased;
+  font-family: "Manrope", system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #1a2046 0%, transparent 60%),
+    linear-gradient(160deg, var(--bg-grad-1), var(--bg-grad-2));
+  background-attachment: fixed;
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-.app { max-width: 520px; margin: 0 auto; padding: 24px 16px 48px; }
-.header { text-align: center; margin-bottom: 20px; }
-.header h1 { font-size: 36px; letter-spacing: 1px; }
-.subtitle { color: var(--muted); margin-top: 4px; }
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 24px 18px 60px;
+  min-height: 100vh;
+}
 
-.screen { display: none; }
-.screen.active { display: block; animation: fade .25s ease; }
-@keyframes fade { from { opacity: 0; transform: translateY(8px);} to {opacity:1; transform:none;} }
+/* ===== Экраны ===== */
+.screen { display: none; animation: fade .35s ease; }
+.screen.active { display: block; }
+@keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+/* ===== Типографика / служебные ===== */
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted);
+}
+.muted-small { color: var(--muted); font-size: 13px; margin-top: 8px; text-align: center; }
+.error-text { color: var(--danger); font-size: 14px; min-height: 18px; margin-top: 10px; text-align: center; }
+
+/* ===== Карточки ===== */
 .card {
-  background: linear-gradient(180deg, var(--card), #191c3c);
-  border: 1px solid rgba(255,255,255,.06); border-radius: 18px;
-  padding: 22px; box-shadow: 0 12px 40px rgba(0,0,0,.35); margin-bottom: 16px;
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
 }
-.card.center { text-align: center; }
 
-label { display: block; font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
-
-input[type=text] {
-  width: 100%; background: #0f1230; border: 1px solid rgba(255,255,255,.1);
-  border-radius: 12px; padding: 14px; color: var(--text); font-size: 16px; outline: none;
+/* ===== Бренд ===== */
+.brand { text-align: center; margin: 18px 0 28px; }
+.brand-mark { font-size: 56px; line-height: 1; filter: drop-shadow(0 8px 16px rgba(255,92,92,.35)); }
+.brand-title {
+  font-family: "Oswald", sans-serif; font-weight: 700; font-size: 52px;
+  letter-spacing: .18em; margin-top: 6px;
+  background: linear-gradient(90deg, #fff, #ffd76a 60%, var(--accent));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-input[type=text]:focus { border-color: var(--accent); }
-.code-field { text-transform: uppercase; letter-spacing: 8px; text-align: center; font-size: 24px; font-weight: 700; }
+.brand-sub { color: var(--muted); font-size: 15px; margin-top: 2px; }
 
+/* ===== Поля ===== */
+.field { display: block; margin-bottom: 16px; }
+.field-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+input[type="text"], .select {
+  width: 100%; padding: 14px 16px; font-size: 16px; color: var(--text);
+  background: #0e1326; border: 1px solid var(--line); border-radius: 12px;
+  font-family: inherit; transition: border-color .2s, box-shadow .2s;
+}
+input[type="text"]:focus, .select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255,92,92,.18);
+}
+.select { appearance: none; cursor: pointer; }
+
+/* ===== Кнопки ===== */
 .btn {
-  width: 100%; margin-top: 14px; padding: 14px; border: none; border-radius: 12px;
-  background: #2a2f5e; color: var(--text); font-size: 16px; font-weight: 600;
-  cursor: pointer; transition: transform .08s ease, filter .15s ease;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 100%; padding: 14px 18px; font-size: 16px; font-weight: 700;
+  border: none; border-radius: 12px; cursor: pointer; font-family: inherit;
+  transition: transform .12s, filter .2s, background .2s; color: #fff;
 }
-.btn:active { transform: scale(.98); }
-.btn:hover { filter: brightness(1.1); }
-.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
-.btn-danger { background: var(--danger); }
-.btn-small { width: auto; margin: 0; padding: 8px 14px; font-size: 13px; }
+.btn:active { transform: scale(.97); }
+.btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.btn-lg { padding: 16px; font-size: 17px; }
+.btn-primary { background: linear-gradient(90deg, var(--accent), #ff7a59); box-shadow: 0 10px 26px rgba(255,92,92,.32); }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-ghost { background: #232a4d; border: 1px solid var(--line); }
+.btn-ghost:hover { background: #2a3258; }
+.btn-danger { background: linear-gradient(90deg, var(--danger), #ff7088); }
+.btn-text { background: none; color: var(--muted); width: auto; margin: 4px auto 0; display: block; }
+.btn-text:hover { color: var(--text); }
+.btn-chip { width: auto; padding: 8px 14px; font-size: 13px; background: #232a4d; border: 1px solid var(--line); }
 
-.divider { text-align: center; margin: 18px 0 6px; color: var(--muted); position: relative; }
-.divider::before, .divider::after {
-  content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: rgba(255,255,255,.1);
+/* ===== Разделитель ===== */
+.divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--muted); font-size: 13px; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* ===== Войти по коду ===== */
+.join-row { display: flex; gap: 10px; }
+.code-input {
+  flex: 1; text-transform: uppercase; letter-spacing: .35em; text-align: center;
+  font-family: "Oswald", sans-serif; font-size: 22px; font-weight: 600;
 }
-.divider::before { left: 0; } .divider::after { right: 0; }
+.join-row .btn { width: auto; padding: 14px 22px; }
+.hint-line { text-align: center; color: var(--muted); font-size: 13px; margin-top: 20px; }
 
-.error { color: var(--danger); margin-top: 12px; min-height: 18px; font-size: 14px; }
-.hint { color: var(--muted); margin-top: 12px; text-align: center; font-size: 14px; }
-.hidden { display: none !important; }
-
-.room-code-box {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  background: #0f1230; border-radius: 12px; padding: 14px; margin-bottom: 18px;
+/* ===== Лобби ===== */
+.lobby-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.room-code {
+  font-family: "Oswald", sans-serif; font-size: 40px; font-weight: 700;
+  letter-spacing: .25em; color: var(--gold);
 }
-.room-code-label { color: var(--muted); font-size: 13px; }
-.room-code { font-size: 28px; font-weight: 800; letter-spacing: 4px; flex: 1; }
+.players-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.players-count {
+  background: var(--accent); color: #fff; font-weight: 700; font-size: 13px;
+  padding: 2px 10px; border-radius: 999px;
+}
 
-.player-list { list-style: none; margin: 10px 0; }
+.player-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .player-list li {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; background: #0f1230; border-radius: 10px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: #0e1326; border: 1px solid var(--line); border-radius: 12px;
 }
-.player-list .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
-.player-list .dot.off { background: var(--muted); }
-.player-list .tag { margin-left: auto; font-size: 12px; color: var(--accent); font-weight: 700; }
-.player-list .score { font-size: 12px; color: var(--warn); font-weight: 600; margin-left: 8px; }
-
-.host-controls { margin-top: 16px; }
-input[type=range] { width: 100%; margin: 8px 0; accent-color: var(--accent); }
-
-/* ===== Фаза и таймер ===== */
-.phase-banner {
-  text-align: center; margin-bottom: 12px;
+.player-list .pl-name { font-weight: 600; flex: 1; }
+.player-list .pl-tag {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  padding: 2px 8px; border-radius: 6px; background: #232a4d; color: var(--muted);
 }
-.phase-banner span {
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  padding: 6px 20px; border-radius: 20px; font-size: 14px; font-weight: 700;
+.player-list .pl-tag.host { background: rgba(255,215,106,.16); color: var(--gold); }
+.player-list .pl-score { font-family: "Oswald", sans-serif; font-size: 18px; color: var(--accent-2); }
+.player-list li.offline { opacity: .45; }
+
+.range { width: 100%; accent-color: var(--accent); height: 6px; cursor: pointer; }
+.waiting { text-align: center; color: var(--muted); padding: 12px; }
+
+/* ===== Игра: верх ===== */
+.game-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.round-badge {
+  font-family: "Oswald", sans-serif; font-size: 15px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); background: var(--card); border: 1px solid var(--line);
+  padding: 10px 16px; border-radius: 12px;
 }
+.round-badge span { color: var(--gold); font-weight: 700; }
 
-.timer-box { text-align: center; margin-bottom: 14px; }
-.timer { font-size: 48px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.timer.low { color: var(--danger); }
-
-/* ===== Баннер говорящего ===== */
-.turn-banner {
-  background: #141830; border: 1px solid var(--accent);
-  border-radius: 14px; padding: 14px; margin-bottom: 14px; text-align: center;
+/* ===== Таймер ===== */
+.timer { position: relative; width: 96px; height: 96px; }
+.timer-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+.timer-ring-bg { fill: none; stroke: var(--line); stroke-width: 8; }
+.timer-ring-fg {
+  fill: none; stroke: var(--ok); stroke-width: 8; stroke-linecap: round;
+  stroke-dasharray: 339.292; stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear, stroke .5s;
 }
-.turn-speaker { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
-.turn-bar {
-  width: 100%; height: 6px; background: #0f1230; border-radius: 3px; overflow: hidden; margin: 6px 0 10px;
+.timer-text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: "Oswald", sans-serif; font-size: 24px; font-weight: 600;
 }
-.turn-fill {
-  height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
-  width: 0%; transition: width .2s linear;
+.timer.warning .timer-ring-fg { stroke: var(--accent-2); }
+.timer.danger .timer-ring-fg { stroke: var(--accent); }
+.timer.danger { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+
+/* ===== Карточка роли ===== */
+.card-flip { perspective: 1200px; margin-bottom: 16px; }
+.role-card-inner {
+  position: relative; border-radius: var(--radius); animation: flipIn .7s cubic-bezier(.2,.8,.2,1);
 }
-
-/* ===== Порядок игроков ===== */
-.order-strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.order-label { color: var(--muted); font-size: 12px; }
-.order-list { display: flex; gap: 4px; flex-wrap: wrap; }
-.order-chip {
-  background: #0f1230; border: 1px solid rgba(255,255,255,.08);
-  border-radius: 8px; padding: 4px 10px; font-size: 12px; color: var(--muted);
+@keyframes flipIn { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0); opacity: 1; } }
+.role-card-face {
+  border-radius: var(--radius); padding: 34px 24px; text-align: center;
+  box-shadow: var(--shadow); border: 1px solid var(--line);
 }
-.order-chip.active {
-  border-color: var(--accent); color: var(--text); background: #1a1f45;
-  font-weight: 700; box-shadow: 0 0 8px rgba(91,124,250,.3);
+.role-location { background: linear-gradient(150deg, #1b2a52, #15203f); }
+.location-name {
+  font-family: "Oswald", sans-serif; font-size: 38px; font-weight: 700;
+  margin-top: 10px; line-height: 1.1;
 }
+.location-hint { color: var(--muted); font-size: 14px; margin-top: 12px; }
 
-/* ===== Роль ===== */
-.role-card { text-align: center; padding: 10px 0 6px; }
-.big-emoji { font-size: 64px; }
-.role-spy h2 { color: var(--danger); margin: 8px 0; }
-.role-spy p, .role-normal p { color: var(--muted); }
-.role-label { font-size: 13px; color: var(--muted); margin-top: 12px; }
-.role-normal h2 { font-size: 28px; color: var(--accent); margin: 4px 0; }
-.role-normal h3 { font-size: 22px; margin: 4px 0; }
+/* Шпионская версия карточки */
+.role-location.is-spy { background: linear-gradient(150deg, #4a1320, #2a0c14); border-color: var(--accent); }
+.is-spy .location-name { color: var(--accent); letter-spacing: .04em; }
+.is-spy .eyebrow { color: #ff9b9b; }
 
-/* ===== Действия ===== */
-.action-row { display: flex; gap: 10px; margin-top: 16px; justify-content: center; }
-.action-row .btn { flex: 1; max-width: 200px; margin-top: 0; }
-
-/* ===== Голосование ===== */
-.vote-panel {
-  background: #0f1230; border-radius: 14px; padding: 16px; margin-top: 14px;
+/* ===== Список локаций ===== */
+.locations-box summary {
+  cursor: pointer; font-weight: 600; color: var(--muted); list-style: none;
 }
-.vote-panel h4 { margin-bottom: 10px; font-size: 15px; }
-.vote-targets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.vote-target-btn { flex: 0 0 auto; }
-.guess-btn { flex: 0 0 auto; font-size: 12px; padding: 6px 10px; }
-.vote-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-.vote-actions .btn { flex: 1; min-width: 130px; }
-.spy-guess-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-
-.locations-details { margin-top: 18px; background: #0f1230; border-radius: 12px; padding: 12px 14px; }
-.locations-details summary { cursor: pointer; color: var(--muted); }
-.locations-list { list-style: none; margin-top: 10px; columns: 2; column-gap: 12px; }
-.locations-list li { padding: 4px 0; font-size: 14px; }
-
-/* ===== Голосовые ===== */
-.voice-card { padding: 16px 14px; }
-.voice-card h4 { margin-bottom: 8px; font-size: 15px; }
-.voice-messages {
-  max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;
+.locations-box summary::-webkit-details-marker { display: none; }
+.locations-box summary::before { content: "▸ "; color: var(--accent); }
+.locations-box[open] summary::before { content: "▾ "; }
+.loc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.loc-grid .loc-item {
+  padding: 10px 12px; background: #0e1326; border: 1px solid var(--line);
+  border-radius: 10px; font-size: 14px;
 }
-.voice-msg { background: #0f1230; border-radius: 10px; padding: 8px 12px; align-self: flex-start; max-width: 90%; }
-.voice-msg.mine { align-self: flex-end; background: #252960; }
-.voice-author { font-size: 11px; color: var(--accent); font-weight: 600; display: block; margin-bottom: 4px; }
-.voice-msg audio { width: 100%; max-width: 280px; height: 32px; }
-.voice-controls { display: flex; align-items: center; gap: 10px; }
-.voice-controls .btn { margin-top: 0; }
-.rec-status { font-size: 13px; color: var(--danger); font-weight: 600; }
-.btn.recording { background: #8b0000; animation: pulse 1s infinite; }
-@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(224,82,96,.6); } 50% { box-shadow: 0 0 0 8px rgba(224,82,96,0); } }
+.loc-grid .loc-item.crossed { opacity: .4; text-decoration: line-through; }
 
-/* ===== Чат ===== */
-.chat-card { padding: 16px 14px; }
-.chat-card h4 { margin-bottom: 8px; font-size: 15px; }
-.chat-messages { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.chat-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
-.chat-msg { background: #0f1230; border-radius: 10px; padding: 8px 12px; max-width: 85%; align-self: flex-start; }
-.chat-msg.mine { align-self: flex-end; background: #252960; }
-.chat-author { font-size: 11px; color: var(--accent); font-weight: 600; margin-right: 6px; }
-.chat-text { font-size: 14px; word-break: break-word; }
-.chat-input-row { display: flex; gap: 8px; }
-.chat-input-row input { flex: 1; padding: 10px; font-size: 14px; }
-.chat-input-row .btn { padding: 10px 16px; margin-top: 0; font-size: 13px; }
+/* Угадывание шпиона */
+.guess-grid .loc-item { cursor: pointer; transition: background .15s, border-color .15s; }
+.guess-grid .loc-item:hover { background: #1a2142; border-color: var(--accent); }
+.spy-guess { border-color: var(--accent); }
+
+/* ===== Голосование (список) ===== */
+.vote-list li { cursor: pointer; transition: border-color .15s, background .15s; }
+.vote-list li:hover { border-color: var(--accent); background: #1a2142; }
+.vote-list .pl-action { font-size: 12px; color: var(--accent); font-weight: 700; }
+
+.game-bottom { margin-top: 8px; }
+
+/* ===== Голосование (оверлей) ===== */
+.vote-overlay {
+  position: fixed; inset: 0; background: rgba(7,9,18,.8); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50;
+  animation: fade .25s ease;
+}
+.vote-modal {
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  border: 1px solid var(--accent); border-radius: var(--radius); padding: 26px;
+  width: 100%; max-width: 380px; box-shadow: var(--shadow); text-align: center;
+}
+.vote-question { font-size: 18px; margin: 12px 0 18px; }
+.vote-question b { color: var(--gold); }
+.vote-progress { display: flex; justify-content: space-around; margin-bottom: 18px; font-weight: 700; }
+.vote-yes { color: var(--ok); }
+.vote-no { color: var(--muted); }
+.vote-actions { display: flex; gap: 10px; }
+.vote-waiting { color: var(--muted); margin-top: 12px; }
 
 /* ===== Результат ===== */
-.result-line { margin: 8px 0; color: var(--muted); }
-.result-line strong { color: var(--text); }
-#resultScores { margin-top: 8px; }
-#resultScores li { justify-content: center; }
+.result-head { text-align: center; margin: 20px 0 24px; }
+.result-emoji { font-size: 64px; }
+.result-title { font-family: "Oswald", sans-serif; font-size: 30px; margin-top: 8px; letter-spacing: .04em; }
+.result-reason { color: var(--muted); margin-top: 8px; }
+.reveal-card .reveal-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+.reveal-card .reveal-row + .reveal-row { border-top: 1px solid var(--line); }
+.reveal-label { color: var(--muted); font-size: 14px; }
+.reveal-value { font-family: "Oswald", sans-serif; font-size: 20px; }
+.reveal-spy { color: var(--accent); }
 
-/* Кнопка кика игрока */
-.btn-kick {
-  background: none;
-  border: none;
-  color: #ef4444;
-  cursor: pointer;
-  font-size: 1.1em;
-  margin-left: auto;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.leaderboard { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.leaderboard li {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: #0e1326; border: 1px solid var(--line); border-radius: 10px;
 }
-.btn-kick:hover {
-  background-color: rgba(239, 68, 68, 0.15);
-  transform: scale(1.1);
-}
+.leaderboard .lb-rank { font-family: "Oswald", sans-serif; font-size: 18px; color: var(--muted); width: 24px; }
+.leaderboard li:first-child .lb-rank { color: var(--gold); }
+.leaderboard .lb-name { flex: 1; font-weight: 600; }
+.leaderboard .lb-meta { font-size: 12px; color: var(--muted); }
+.leaderboard .lb-score { font-family: "Oswald", sans-serif; font-size: 20px; color: var(--accent-2); }
 
-/* Строка смены никнейма в лобби */
-.change-name-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 6px 0 2px;
-}
-.change-name-row input {
-  flex: 1;
-  margin: 0;
-}
-.change-name-row .btn-small {
-  width: auto;
-  flex-shrink: 0;
-  margin: 0;
-  padding: 8px 14px;
-  font-size: 13px;
+/* ===== Тост ===== */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--card-2); border: 1px solid var(--line); color: var(--text);
+  padding: 12px 20px; border-radius: 12px; box-shadow: var(--shadow); z-index: 60;
+  font-size: 14px; max-width: 90%; text-align: center; animation: fade .25s ease;
 }
 
-/* Поле поиска по локациям (шпион) */
-.loc-search {
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #2a2f5a;
-  background: #0f1230;
-  color: #e2e8f0;
-  font-size: 15px;
-  outline: none;
-}
-.loc-search:focus { border-color: var(--accent, #ef4444); }
-.loc-search::placeholder { color: #6b7280; }
-
-
-/* ============================================================
-   Фаза 2/3/4: адаптив, анимации, аватары, спец-роли, i18n, итоги
-   ============================================================ */
-
-/* ===== Переключатель языка ===== */
-.lang-switch { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 4px; }
-.lang-btn {
-  background: #1a1f45; color: var(--muted); border: 1px solid rgba(255,255,255,.08);
-  border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer;
-}
-.lang-btn.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; }
-
-/* ===== Сетка настроек / чекбоксы ===== */
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
-.settings-grid .setting:last-child { grid-column: 1 / -1; }
-.setting label { margin: 0 0 4px; }
-.setting select {
-  width: 100%; background: #0f1230; border: 1px solid rgba(255,255,255,.1);
-  border-radius: 10px; padding: 10px; color: var(--text); font-size: 15px;
-}
-.check-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; color: var(--muted); font-size: 14px; cursor: pointer; }
-.check-row input { width: 18px; height: 18px; accent-color: var(--accent); }
-.lobby-actions { display: flex; gap: 8px; margin: 10px 0; }
-.lobby-actions .btn { margin-top: 0; }
-
-/* ===== Аватары (Фаза 3) ===== */
-.avatar {
-  width: 30px; height: 30px; min-width: 30px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
+/* ===== Адаптив ===== */
+@media (max-width: 420px) {
+  .brand-title { font-size: 42px; }
+  .location-name { font-size: 30px; }
+  .room-code { font-size: 32px; }
+  .loc-grid { grid-template-columns: 1fr; }
 }
 
-/* ===== Анимации (Фаза 2) ===== */
-@keyframes pop { 0% { transform: scale(.85); opacity: 0; } 60% { transform: scale(1.03); } 100% { transform: scale(1); opacity: 1; } }
-.anim-pop:not(.hidden) { animation: pop .35s ease; }
-.timer.low { animation: pulseTimer .8s infinite; }
-@keyframes pulseTimer { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
-.phase-banner:not(.hidden) { animation: fade .3s ease; }
-
-/* ===== Спец-роли (Фаза 4) ===== */
-.special-role {
-  margin-top: 12px; padding: 12px; border-radius: 12px;
-  background: #1a1f45; border: 1px solid var(--accent2); text-align: left; font-size: 14px;
-}
-.special-role .hint { text-align: left; margin-top: 6px; }
-
-/* ===== Зритель ===== */
-#spectatorBanner { color: var(--text); }
-#spectatorBanner.phase-banner { background: linear-gradient(135deg, #6b7280, #374151); padding: 8px 14px; border-radius: 20px; display: inline-block; }
-
-/* ===== Быстрые фразы / чат ===== */
-.quick-phrases { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.quick-phrase {
-  background: #0f1230; border: 1px solid rgba(255,255,255,.1); border-radius: 16px;
-  padding: 6px 12px; font-size: 13px; color: var(--text); cursor: pointer;
-}
-.quick-phrase:active { transform: scale(.95); }
-.chat-box { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.chat-msg { display: flex; align-items: flex-start; gap: 8px; background: #0f1230; border-radius: 10px; padding: 8px 10px; max-width: 90%; align-self: flex-start; }
-.chat-msg.mine { align-self: flex-end; background: #252960; flex-direction: row-reverse; }
-.chat-msg .chat-author { display: block; font-size: 11px; color: var(--accent); font-weight: 600; }
-.chat-msg .chat-text { font-size: 14px; word-break: break-word; }
-.chat-msg audio { height: 32px; max-width: 200px; }
-.voice-controls { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-.voice-controls .btn { margin-top: 0; }
-.btn.recording { background: #8b0000; animation: pulse 1s infinite; }
-.rec-status { font-size: 13px; color: var(--danger); font-weight: 600; }
-
-/* ===== Списки локаций / голосование ===== */
-.loc-list { list-style: none; max-height: 200px; overflow-y: auto; }
-.loc-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 14px; }
-.vote-btns { display: flex; gap: 8px; margin-top: 10px; }
-.vote-actions-inline { display: flex; gap: 8px; margin: 8px 0; }
-.vote-count { font-size: 13px; color: var(--muted); margin-right: 12px; }
-.btn-inline { width: auto; margin: 0; padding: 6px 12px; flex-shrink: 0; }
-
-/* ===== Итоги: раскрытие ролей ===== */
-.reveal-list { list-style: none; margin: 8px 0; }
-.reveal-list li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: #0f1230; border-radius: 10px; margin-bottom: 6px; font-size: 14px; }
-.role-tag { color: var(--muted); }
-.role-tag.spy { color: var(--danger); font-weight: 700; }
-.role-tag.det { color: var(--ok); font-weight: 700; }
-.role-tag.partner { color: var(--warn); font-weight: 700; }
-#resultScores li { display: flex; align-items: center; gap: 10px; }
-
-/* ===== Мобильная адаптация (Фаза 2) ===== */
-button, .btn, select, input { touch-action: manipulation; }
-.btn { min-height: 44px; }
-.btn-small { min-height: 36px; }
-.lang-btn, .quick-phrase { min-height: 32px; }
-
-@media (max-width: 600px) {
-  .app { padding: 16px 12px 40px; }
-  .header h1 { font-size: 30px; }
-  .settings-grid { grid-template-columns: 1fr; }
-  .room-code { font-size: 24px; }
-  .timer { font-size: 40px; }
-  .action-row { flex-direction: column; }
-  .action-row .btn { max-width: none; }
-  .chat-msg { max-width: 100%; }
-}
-
-@media (max-width: 380px) {
-  .room-code-box { gap: 6px; }
-  .header h1 { font-size: 26px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

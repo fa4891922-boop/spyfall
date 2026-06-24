@@ -1,7 +1,7 @@
 {
   "name": "spyfall",
-  "version": "2.0.0",
-  "description": "Игра Шпион (Spyfall) — многопользовательская браузерная игра на Node.js + Socket.IO",
+  "version": "3.0.0",
+  "description": "Игра Шпион (Spyfall) — многопользовательская браузерная игра на Node.js + Socket.IO. Без ролей, чата и ботов.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,13 +11,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "express-rate-limit": "^7.4.0",
-    "socket.io": "^4.7.5",
-    "socket.io-client": "^4.8.3"
-  },
-  "optionalDependencies": {
-    "@socket.io/redis-adapter": "^8.3.0",
-    "redis": "^4.7.0"
+    "socket.io": "^4.7.5"
   },
   "license": "MIT"
 }
