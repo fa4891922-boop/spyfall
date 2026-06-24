@@ -4,14 +4,25 @@
 const LOG = {
   _ts() { return new Date().toISOString(); },
   info(tag, msg, data) {
-    const d = data !== undefined ? JSON.stringify(data).slice(0, 500) : "";
-    console.log(`[${this._ts()}] [${tag}] ${msg}`, d || "");
+    if (data !== undefined) {
+      console.log(`[${this._ts()}] [${tag}] ${msg}`, JSON.stringify(data).slice(0, 500));
+    } else {
+      console.log(`[${this._ts()}] [${tag}] ${msg}`);
+    }
   },
   error(tag, msg, err) {
-    console.error(`[${this._ts()}] [${tag}] ${msg}`, err || "");
+    if (err !== undefined) {
+      console.error(`[${this._ts()}] [${tag}] ${msg}`, err);
+    } else {
+      console.error(`[${this._ts()}] [${tag}] ${msg}`);
+    }
   },
   warn(tag, msg, data) {
-    console.warn(`[${this._ts()}] [${tag}] ${msg}`, data !== undefined ? data : "");
+    if (data !== undefined) {
+      console.warn(`[${this._ts()}] [${tag}] ${msg}`, data);
+    } else {
+      console.warn(`[${this._ts()}] [${tag}] ${msg}`);
+    }
   },
   assert(val, tag, msg) {
     if (val === undefined || val === null) {
@@ -75,11 +86,17 @@ function showConfirm(text, title, onYes) {
   _confirmCb = onYes;
 }
 $("btn-confirm-yes").addEventListener("click", () => {
+  if ($("confirm-overlay").hidden) return;
   LOG.info("CONFIRM", "Пользователь нажал Подтвердить");
   $("confirm-overlay").hidden = true;
-  if (_confirmCb) { _confirmCb(); _confirmCb = null; }
+  if (_confirmCb) {
+    const cb = _confirmCb;
+    _confirmCb = null;
+    cb();
+  }
 });
 $("btn-confirm-no").addEventListener("click", () => {
+  if ($("confirm-overlay").hidden) return;
   LOG.info("CONFIRM", "Пользователь нажал Отмена");
   $("confirm-overlay").hidden = true;
   _confirmCb = null;
