@@ -9,6 +9,16 @@ const path = require("path");
 const fs = require("fs");
 const { Server } = require("socket.io");
 
+// ===== Система логирования (сервер) =====
+function log(tag, msg, data) {
+  const ts = new Date().toISOString();
+  const d = data !== undefined ? JSON.stringify(data).slice(0, 500) : "";
+  console.log(`[${ts}] [${tag}] ${msg}`, d || "");
+}
+function logErr(tag, msg, err) {
+  console.error(`[${new Date().toISOString()}] [${tag}] ${msg}`, err || "");
+}
+
 // ===== Загрузка наборов локаций из data/locations =====
 const LOC_DIR = path.join(__dirname, "data", "locations");
 let LOCATION_SETS = {};        // id -> { id, title, locations:[{name, hint}] }
@@ -24,10 +34,11 @@ function loadLocationSets() {
         const locations = JSON.parse(fs.readFileSync(path.join(LOC_DIR, s.file), "utf8"));
         LOCATION_SETS[s.id] = { id: s.id, title: s.title, locations };
         LOCATION_SETS_META.push({ id: s.id, title: s.title, count: locations.length });
-      } catch (e) { console.error("Не удалось загрузить набор", s.file, e.message); }
+      } catch (e) { logErr("LOCATIONS", "Не удалось загрузить набор " + s.file, e.message); }
     });
+    log("INIT", "Наборы локаций загружены", { sets: LOCATION_SETS_META.length });
   } catch (e) {
-    console.error("Нет манифеста локаций:", e.message);
+    logErr("LOCATIONS", "Нет манифеста локаций", e.message);
   }
 }
 loadLocationSets();
@@ -59,6 +70,17 @@ function rateLimited(socketId, action, max, windowMs) {
 }
 
 app.use(express.json({ limit: "256kb" }));
+
+// HTTP логирование
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    log("HTTP", `${req.method} ${req.originalUrl}`, { status: res.statusCode, ms });
+  });
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/healthz", (req, res) => res.send("ok"));
@@ -70,6 +92,7 @@ function countPlayers() {
 }
 
 app.get("/stats", (req, res) => {
+  log("HTTP", "/stats запрошен");
   const popular = Object.entries(analytics.popularLocations).sort((a, b) => b[1] - a[1]).slice(0, 10)
     .map(([name, count]) => ({ name, count }));
   res.json({
@@ -81,7 +104,10 @@ app.get("/stats", (req, res) => {
   });
 });
 
-app.get("/api/locations", (req, res) => res.json({ sets: LOCATION_SETS_META }));
+app.get("/api/locations", (req, res) => {
+  log("HTTP", "/api/locations запрошен", { setCount: LOCATION_SETS_META.length });
+  res.json({ sets: LOCATION_SETS_META });
+});
 
 const rooms = {};
 
@@ -150,6 +176,7 @@ function ensureStat(room, id) {
 }
 
 function startGame(room, opts = {}) {
+  log("GAME", "Запуск игры", { code: room.code, setId: opts.setId, duration: opts.duration, playerCount: room.order.filter((id) => room.players[id]?.connected).length });
   const durationMinutes = Math.min(15, Math.max(1, parseInt(opts.duration, 10) || 8));
   room.setId = LOCATION_SETS[opts.setId] ? opts.setId : (room.setId || "classic");
 
@@ -186,6 +213,7 @@ function startGame(room, opts = {}) {
   };
   room.vote = null;
 
+  log("GAME", "Раунд настроен", { code: room.code, location: location.name, spyId: spyId.slice(0, 8), roundNum: room.roundCount, durationMs: room.round.durationMs });
   const playersInfo = publicPlayers(room);
   playerIds.forEach((id) => {
     const isSpy = id === spyId;
@@ -212,7 +240,8 @@ function startGame(room, opts = {}) {
 }
 
 function endGame(room, reason, winner) {
-  if (!room.round) return;
+  if (!room.round) { log("GAME", "endGame: нет активного раунда", { code: room?.code }); return; }
+  log("GAME", "Конец игры", { code: room.code, reason, winner, location: room.round.locationName, spyId: room.round.spyId?.slice(0, 8) });
   clearRoomTimer(room);
   const spy = room.players[room.round.spyId];
   if (!room.scores) room.scores = {};
@@ -314,6 +343,7 @@ function rekeyPlayer(room, oldId, newId) {
 }
 
 io.on("connection", (socket) => {
+  log("SOCKET", "Новое подключение", { socketId: socket.id.slice(0, 8), totalSockets: io.engine?.clientsCount });
   let currentRoom = null;
 
   function joinRoom(code, name, sessionId) {
@@ -359,34 +389,40 @@ io.on("connection", (socket) => {
   }
 
   socket.on("createRoom", ({ name, sessionId } = {}, cb) => {
-    if (rateLimited(socket.id, "create", 5, 60 * 1000)) { if (cb) cb({ ok: false, error: "Слишком часто. Подождите немного." }); return; }
+    log("SOCKET", "createRoom запрос", { socketId: socket.id.slice(0, 8), name, hasSession: !!sessionId });
+    if (rateLimited(socket.id, "create", 5, 60 * 1000)) { log("SOCKET", "createRoom: rate limited", { socketId: socket.id.slice(0, 8) }); if (cb) cb({ ok: false, error: "Слишком часто. Подождите немного." }); return; }
     enforceRoomLimit();
     if (Object.keys(rooms).length >= MAX_ROOMS) { if (cb) cb({ ok: false, error: "Сервер занят, попробуйте позже." }); return; }
     const code = genRoomCode();
+    log("ROOM", "Комната создана", { code, hostId: socket.id.slice(0, 8) });
     rooms[code] = {
       code, hostId: socket.id, players: {}, order: [], state: "lobby", round: null, timerTimeout: null,
       vote: null, scores: {}, stats: {}, locationBag: [], lastLocation: null,
       setId: "classic", roundCount: 0, lastActivity: Date.now(), emptySince: null,
     };
     joinRoom(code, name, sessionId);
+    log("ROOM", "Хост вошёл в комнату", { code, name, totalRooms: Object.keys(rooms).length });
     if (cb) cb({ ok: true, code });
   });
 
   socket.on("joinRoom", ({ code, name, sessionId } = {}, cb) => {
+    log("SOCKET", "joinRoom запрос", { socketId: socket.id.slice(0, 8), code, name });
     if (rateLimited(socket.id, "join", 10, 60 * 1000)) { if (cb) cb({ ok: false, error: "Слишком часто. Подождите немного." }); return; }
     code = (code || "").toUpperCase().trim();
     const room = rooms[code];
-    if (!room) { if (cb) cb({ ok: false, error: "Комната не найдена." }); return; }
+    if (!room) { log("SOCKET", "joinRoom: комната не найдена", { code }); if (cb) cb({ ok: false, error: "Комната не найдена." }); return; }
     if (room.state === "playing") {
       const existingId = sessionId && Object.keys(room.players).find((id) => room.players[id].sessionId === sessionId);
       if (existingId) { doResume(room, existingId, name, sessionId); if (cb) cb({ ok: true, code, resumed: true }); return; }
       if (cb) cb({ ok: false, error: "Игра уже идёт. Дождитесь конца раунда." }); return;
     }
     joinRoom(code, name, sessionId);
+    log("ROOM", "Игрок вошёл в комнату", { code, name });
     if (cb) cb({ ok: true, code });
   });
 
   socket.on("resume", ({ code, sessionId, name } = {}, cb) => {
+    log("SOCKET", "resume запрос", { socketId: socket.id.slice(0, 8), code, hasSession: !!sessionId });
     code = (code || "").toUpperCase().trim();
     const room = rooms[code];
     if (!room || !sessionId) { if (cb) cb({ ok: false }); return; }
@@ -406,7 +442,10 @@ io.on("connection", (socket) => {
   // Шпион угадывает локацию
   socket.on("spyGuess", ({ locationName } = {}) => {
     const room = rooms[currentRoom];
-    if (!room || !room.round || room.round.spyId !== socket.id) return;
+    if (!room || !room.round || room.round.spyId !== socket.id) {
+      log("SOCKET", "spyGuess: невалидный запрос", { hasRoom: !!room, hasRound: !!room?.round, isSpy: room?.round?.spyId === socket.id });
+      return;
+    }
     const correct = locationName === room.round.locationName;
     const spyName = room.players[socket.id]?.name || "Шпион";
     io.to(room.code).emit("spyGuessResult", { correct, guess: locationName, actual: room.round.locationName, spyName });
@@ -420,6 +459,7 @@ io.on("connection", (socket) => {
     if (!room || !room.round || room.vote) return;
     if (!room.players[targetId] || targetId === socket.id) return;
     if (rateLimited(socket.id, "vote", 3, 30 * 1000)) return;
+    log("VOTE", "Голосование начато", { code: room.code, initiator: room.players[socket.id]?.name, target: room.players[targetId]?.name });
     room.vote = { initiatorId: socket.id, targetId, yes: [socket.id], no: [] };
     emitVoteUpdate(room);
     checkAllVoted(room);
@@ -468,6 +508,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     const room = rooms[currentRoom];
     if (!room || !room.players[socket.id]) return;
+    log("SOCKET", "Игрок отключился", { code: room.code, name: room.players[socket.id]?.name, socketId: socket.id.slice(0, 8) });
     room.players[socket.id].connected = false;
     if (room.hostId === socket.id) {
       const next = room.order.find((id) => room.players[id]?.connected);
@@ -481,4 +522,7 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, () => console.log(`Шпион сервер запущен на порту ${PORT}`));
+server.listen(PORT, () => {
+  log("INIT", `Сервер запущен на порту ${PORT}`, { port: PORT, nodeVersion: process.version });
+  console.log(`Шпион сервер запущен на порту ${PORT}`);
+});

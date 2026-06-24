@@ -278,6 +278,7 @@ input[type="text"]:focus, .select:focus {
   border: 1px solid var(--line); border-radius: var(--radius); padding: 26px;
   width: 100%; max-width: 360px; box-shadow: var(--shadow); text-align: center;
 }
+.confirm-modal .eyebrow { display: block; margin-bottom: 12px; }
 .confirm-text { font-size: 16px; line-height: 1.5; margin-bottom: 20px; }
 .confirm-actions { display: flex; gap: 10px; }
 .confirm-actions .btn { flex: 1; }
