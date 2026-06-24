@@ -108,7 +108,7 @@
       </div>
 
       <!-- Список локаций (подсказка для всех) -->
-      <details class="card locations-box">
+      <details class="card locations-box" open>
         <summary>Список возможных локаций</summary>
         <div class="loc-grid" id="loc-grid"></div>
       </details>
@@ -116,6 +116,7 @@
       <!-- Угадывание для шпиона -->
       <div class="card spy-guess" id="spy-guess" hidden>
         <span class="eyebrow">Ты шпион — угадай локацию</span>
+        <input id="guess-search" type="text" placeholder="Поиск локации…" autocomplete="off" class="search-input" />
         <div class="loc-grid guess-grid" id="guess-grid"></div>
       </div>
 
@@ -172,6 +173,17 @@
           <button id="btn-vote-no" class="btn btn-ghost">Невиновен</button>
         </div>
         <p class="vote-waiting" id="vote-waiting" hidden>Голос учтён. Ждём остальных…</p>
+      </div>
+    </div>
+
+    <!-- Модальное подтверждение -->
+    <div class="confirm-overlay" id="confirm-overlay" hidden>
+      <div class="confirm-modal">
+        <p class="confirm-text" id="confirm-text"></p>
+        <div class="confirm-actions">
+          <button id="btn-confirm-yes" class="btn btn-danger">Подтвердить</button>
+          <button id="btn-confirm-no" class="btn btn-ghost">Отмена</button>
+        </div>
       </div>
     </div>
 

@@ -161,7 +161,7 @@ input[type="text"]:focus, .select:focus {
 .timer-ring-fg {
   fill: none; stroke: var(--ok); stroke-width: 8; stroke-linecap: round;
   stroke-dasharray: 339.292; stroke-dashoffset: 0;
-  transition: stroke-dashoffset 1s linear, stroke .5s;
+  transition: stroke .5s;
 }
 .timer-text {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -209,6 +209,12 @@ input[type="text"]:focus, .select:focus {
 .loc-grid .loc-item.crossed { opacity: .4; text-decoration: line-through; }
 
 /* Угадывание шпиона */
+.search-input {
+  width: 100%; padding: 12px 14px; font-size: 15px; color: var(--text);
+  background: #0e1326; border: 1px solid var(--line); border-radius: 10px;
+  font-family: inherit; margin-bottom: 12px; transition: border-color .2s;
+}
+.search-input:focus { outline: none; border-color: var(--accent); }
 .guess-grid .loc-item { cursor: pointer; transition: background .15s, border-color .15s; }
 .guess-grid .loc-item:hover { background: #1a2142; border-color: var(--accent); }
 .spy-guess { border-color: var(--accent); }
@@ -260,6 +266,21 @@ input[type="text"]:focus, .select:focus {
 .leaderboard .lb-name { flex: 1; font-weight: 600; }
 .leaderboard .lb-meta { font-size: 12px; color: var(--muted); }
 .leaderboard .lb-score { font-family: "Oswald", sans-serif; font-size: 20px; color: var(--accent-2); }
+
+/* ===== Модальное подтверждение ===== */
+.confirm-overlay {
+  position: fixed; inset: 0; background: rgba(7,9,18,.8); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 55;
+  animation: fade .25s ease;
+}
+.confirm-modal {
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 26px;
+  width: 100%; max-width: 360px; box-shadow: var(--shadow); text-align: center;
+}
+.confirm-text { font-size: 16px; line-height: 1.5; margin-bottom: 20px; }
+.confirm-actions { display: flex; gap: 10px; }
+.confirm-actions .btn { flex: 1; }
 
 /* ===== Тост ===== */
 .toast {

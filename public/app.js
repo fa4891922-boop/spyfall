@@ -30,6 +30,22 @@ function toast(msg, ms = 2600) {
   t._timer = setTimeout(() => { t.hidden = true; }, ms);
 }
 
+// ===== Модальное подтверждение (вместо confirm) =====
+let _confirmCb = null;
+function showConfirm(text, onYes) {
+  $("confirm-text").textContent = text;
+  $("confirm-overlay").hidden = false;
+  _confirmCb = onYes;
+}
+$("btn-confirm-yes").addEventListener("click", () => {
+  $("confirm-overlay").hidden = true;
+  if (_confirmCb) { _confirmCb(); _confirmCb = null; }
+});
+$("btn-confirm-no").addEventListener("click", () => {
+  $("confirm-overlay").hidden = true;
+  _confirmCb = null;
+});
+
 // ===== Главный экран =====
 $("input-name").value = savedName;
 $("input-code").addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
@@ -156,6 +172,7 @@ socket.on("roleAssigned", (data) => {
     $("location-name").textContent = "ТЫ ШПИОН";
     $("location-hint").textContent = "Угадай локацию по вопросам — или не дай себя вычислить.";
     $("spy-guess").hidden = false;
+    $("guess-search").value = "";
     renderGuessGrid();
   } else {
     card.classList.remove("is-spy");
@@ -186,20 +203,23 @@ function renderLocList() {
 }
 
 // Сетка для угадывания шпионом
-function renderGuessGrid() {
+function renderGuessGrid(filter = "") {
   const grid = $("guess-grid"); grid.innerHTML = "";
-  state.locations.forEach((name) => {
+  const q = filter.trim().toLowerCase();
+  state.locations.filter((n) => !q || n.toLowerCase().includes(q)).forEach((name) => {
     const div = document.createElement("div");
     div.className = "loc-item";
     div.textContent = name;
     div.addEventListener("click", () => {
-      if (confirm(`Угадать локацию: «${name}»?\nЕсли неверно — граждане победят.`)) {
+      showConfirm(`Угадать локацию: «${name}»? Если неверно — граждане победят.`, () => {
         socket.emit("spyGuess", { locationName: name });
-      }
+      });
     });
     grid.appendChild(div);
   });
 }
+
+$("guess-search").addEventListener("input", (e) => renderGuessGrid(e.target.value));
 
 // Игроки для голосования
 function renderVotePlayers(players) {
@@ -211,14 +231,14 @@ function renderVotePlayers(players) {
     li.innerHTML = `<span class="pl-name">${esc(p.name)}</span><span class="pl-action">Обвинить →</span>`;
     li.addEventListener("click", () => {
       if (!p.connected) return;
-      if (confirm(`Начать голосование против «${p.name}»?`)) socket.emit("requestVote", { targetId: p.id });
+      showConfirm(`Начать голосование против «${p.name}»?`, () => socket.emit("requestVote", { targetId: p.id }));
     });
     ul.appendChild(li);
   });
 }
 
 $("btn-end-round").addEventListener("click", () => {
-  if (confirm("Завершить раунд без результата?")) socket.emit("endRound");
+  showConfirm("Завершить раунд без результата?", () => socket.emit("endRound"));
 });
 
 // ===== Таймер =====
@@ -258,14 +278,12 @@ socket.on("voteUpdate", (v) => {
   $("vote-no").textContent = "Против: " + (v.noNames?.length || 0);
 
   const iAmTarget = v.targetId === socket.id;
-  const iVoted = (v.yesNames || []).includes(myName()) || (v.noNames || []).includes(myName());
+  const iVoted = (v.yesIds || []).includes(socket.id) || (v.noIds || []).includes(socket.id);
   $("vote-actions").hidden = iAmTarget || iVoted;
   $("vote-waiting").hidden = !(iVoted && !iAmTarget) && !iAmTarget;
   if (iAmTarget) { $("vote-waiting").hidden = false; $("vote-waiting").textContent = "Вас обвиняют! Ждём решения остальных…"; }
   else if (iVoted) { $("vote-waiting").hidden = false; $("vote-waiting").textContent = "Голос учтён. Ждём остальных…"; }
 });
-
-function myName() { return savedName || "Игрок"; }
 
 $("btn-vote-yes").addEventListener("click", () => { socket.emit("castVote", { vote: "yes" }); });
 $("btn-vote-no").addEventListener("click", () => { socket.emit("castVote", { vote: "no" }); });

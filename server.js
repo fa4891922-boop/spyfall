@@ -280,6 +280,7 @@ function emitVoteUpdate(room) {
   io.to(room.code).emit("voteUpdate", {
     initiatorId: room.vote.initiatorId, initiatorName: room.players[room.vote.initiatorId]?.name,
     targetId: room.vote.targetId, targetName: room.players[room.vote.targetId]?.name,
+    yesIds: room.vote.yes.slice(), noIds: room.vote.no.slice(),
     yesNames: room.vote.yes.map((id) => room.players[id]?.name),
     noNames: room.vote.no.map((id) => room.players[id]?.name),
   });
