@@ -118,6 +118,11 @@ function emitAction(event, payload, ack) {
 function show(name) {
   Object.values(screens).forEach((s) => s.classList.remove("active"));
   screens[name].classList.add("active");
+  // Оверлей голосования имеет смысл только во время игры.
+  if (name !== "game") {
+    const vo = $("vote-overlay");
+    if (vo) vo.hidden = true;
+  }
 }
 
 function toast(msg, ms = 2600) {
@@ -368,9 +373,18 @@ bindSocketEvent("timeUp", () => { toast("⏰ Время вышло! Пора г�
 
 // ===== Голосование =====
 bindSocketEvent("voteUpdate", (v) => {
+  // Игнорируем пустые/сталые воты (напр. реплей при reconnect вне игры).
+  if (!v || !v.targetId || !v.initiatorName || !v.targetName) {
+    $("vote-overlay").hidden = true;
+    return;
+  }
+  if (!screens.game.classList.contains("active")) {
+    $("vote-overlay").hidden = true;
+    return;
+  }
   $("vote-overlay").hidden = false;
-  $("vote-initiator").textContent = v.initiatorName || "?";
-  $("vote-target").textContent = v.targetName || "?";
+  $("vote-initiator").textContent = v.initiatorName;
+  $("vote-target").textContent = v.targetName;
   $("vote-yes").textContent = "За: " + (v.yesNames?.length || 0);
   $("vote-no").textContent = "Против: " + (v.noNames?.length || 0);
 
