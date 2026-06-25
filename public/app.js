@@ -34,7 +34,13 @@ const LOG = {
 };
 LOG.info("INIT", "Клиент загружен", { sessionId: localStorage.getItem("spy_session")?.slice(0, 8) + "…", savedName: localStorage.getItem("spy_name"), savedRoom: localStorage.getItem("spy_room") });
 
-const socket = io();
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 800,
+  reconnectionDelayMax: 5000,
+  timeout: 12000,
+});
 const $ = (id) => document.getElementById(id);
 const screens = {
   home: $("screen-home"), lobby: $("screen-lobby"),
@@ -51,7 +57,67 @@ let state = {
   code: null, hostId: null, myId: null, isHost: false,
   isSpy: false, locations: [], crossed: new Set(),
   endsAt: 0, durationMs: 0, timerRAF: null, roundNum: 0,
+  isConnected: socket.connected,
 };
+let resumeInFlight = false;
+let lastResumeAttemptAt = 0;
+const NETWORK_ACTION_IDS = [
+  "btn-create", "btn-join", "select-set", "btn-start", "btn-end-round",
+  "btn-vote-yes", "btn-vote-no", "btn-next-round", "btn-confirm-yes",
+];
+
+function bindSocketEvent(event, handler) {
+  socket.off(event);
+  socket.on(event, handler);
+}
+
+function bindManagerEvent(event, handler) {
+  socket.io.off(event);
+  socket.io.on(event, handler);
+}
+
+function socketStatusEl() {
+  let el = $("socket-status");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "socket-status";
+    el.className = "socket-status";
+    el.hidden = true;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function syncNetworkControls() {
+  NETWORK_ACTION_IDS.forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    if (id === "btn-confirm-yes") {
+      el.disabled = !state.isConnected || $("confirm-overlay")?.hidden || !_confirmCb;
+      return;
+    }
+    el.disabled = !state.isConnected;
+  });
+}
+
+function setNetworkState(connected, message = "") {
+  state.isConnected = connected;
+  document.body.classList.toggle("socket-offline", !connected);
+  const status = socketStatusEl();
+  status.hidden = connected;
+  status.textContent = message || "Связь с сервером потеряна. Восстанавливаем подключение…";
+  syncNetworkControls();
+}
+
+function emitAction(event, payload, ack) {
+  if (!state.isConnected) {
+    LOG.warn("SOCKET", `Действие ${event} заблокировано: нет соединения`);
+    toast("Связь восстанавливается. Попробуйте через пару секунд.");
+    return false;
+  }
+  socket.emit(event, payload, ack);
+  return true;
+}
 
 function show(name) {
   Object.values(screens).forEach((s) => s.classList.remove("active"));
@@ -81,12 +147,12 @@ function showConfirm(text, title, onYes) {
 
   $("confirm-title").textContent = title;
   $("confirm-text").textContent = text;
-  $("btn-confirm-yes").disabled = !text || !onYes;
+  $("btn-confirm-yes").disabled = !text || !onYes || !state.isConnected;
   $("confirm-overlay").hidden = false;
   _confirmCb = onYes;
 }
 $("btn-confirm-yes").addEventListener("click", () => {
-  if ($("confirm-overlay").hidden) return;
+  if ($("confirm-overlay").hidden || $("btn-confirm-yes").disabled) return;
   LOG.info("CONFIRM", "Пользователь нажал Подтвердить");
   $("confirm-overlay").hidden = true;
   if (_confirmCb) {
@@ -115,7 +181,7 @@ function getName() {
 $("btn-create").addEventListener("click", () => {
   const name = getName();
   LOG.info("ROOM", "Запрос создания комнаты", { name, sessionId: sessionId.slice(0, 8) + "…" });
-  socket.emit("createRoom", { name, sessionId }, (res) => {
+  emitAction("createRoom", { name, sessionId }, (res) => {
     LOG.info("ROOM", "Ответ на createRoom", { ok: res?.ok, error: res?.error, code: res?.code });
     if (!res || !res.ok) { $("home-error").textContent = res?.error || "Не удалось создать комнату."; return; }
     enterRoom(res.code);
@@ -129,7 +195,7 @@ function doJoin() {
   if (code.length < 4) { $("home-error").textContent = "Введите код из 4 символов."; return; }
   const name = getName();
   LOG.info("ROOM", "Запрос входа в комнату", { code, name, sessionId: sessionId.slice(0, 8) + "…" });
-  socket.emit("joinRoom", { code, name, sessionId }, (res) => {
+  emitAction("joinRoom", { code, name, sessionId }, (res) => {
     LOG.info("ROOM", "Ответ на joinRoom", { ok: res?.ok, error: res?.error, code: res?.code, resumed: res?.resumed });
     if (!res || !res.ok) { $("home-error").textContent = res?.error || "Не удалось войти."; return; }
     enterRoom(res.code);
@@ -149,10 +215,10 @@ $("btn-copy").addEventListener("click", () => {
   navigator.clipboard?.writeText(state.code).then(() => toast("Код скопирован: " + state.code)).catch(() => toast(state.code));
 });
 $("input-duration").addEventListener("input", (e) => { $("dur-label").textContent = e.target.value; });
-$("select-set").addEventListener("change", (e) => { socket.emit("setLocationSet", { setId: e.target.value }); });
+$("select-set").addEventListener("change", (e) => { emitAction("setLocationSet", { setId: e.target.value }); });
 
 $("btn-start").addEventListener("click", () => {
-  socket.emit("startGame", {
+  emitAction("startGame", {
     duration: parseInt($("input-duration").value, 10),
     setId: $("select-set").value,
   });
@@ -161,7 +227,8 @@ $("btn-start").addEventListener("click", () => {
 $("btn-leave-lobby").addEventListener("click", leaveRoom);
 $("btn-back-lobby").addEventListener("click", () => show("lobby"));
 function leaveRoom() {
-  socket.emit("leaveRoom");
+  if (state.isConnected) emitAction("leaveRoom");
+  else LOG.warn("SOCKET", "Выход из комнаты выполнен локально: нет соединения");
   localStorage.removeItem("spy_room");
   state.code = null;
   show("home");
@@ -197,7 +264,7 @@ function renderLobbyPlayers(players) {
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 // ===== roomUpdate =====
-socket.on("roomUpdate", (data) => {
+bindSocketEvent("roomUpdate", (data) => {
   LOG.info("SOCKET", "roomUpdate получен", { state: data.state, players: data.players?.length, roundNum: data.roundNum });
   state.code = data.code;
   state.hostId = data.hostId;
@@ -218,7 +285,7 @@ socket.on("roomUpdate", (data) => {
 });
 
 // ===== Начало раунда =====
-socket.on("roleAssigned", (data) => {
+bindSocketEvent("roleAssigned", (data) => {
   LOG.info("SOCKET", "roleAssigned получен", { isSpy: data.isSpy, location: data.isSpy ? "(скрыто)" : data.location, roundNum: data.roundNum, players: data.players?.length });
   state.isSpy = data.isSpy;
   state.locations = data.locations || [];
@@ -276,7 +343,7 @@ function renderGuessGrid(filter = "") {
     div.textContent = name;
     div.addEventListener("click", () => {
       showConfirm(`Угадать локацию: «${name}»? Если неверно — граждане победят.`, "Догадка шпиона", () => {
-        socket.emit("spyGuess", { locationName: name });
+        emitAction("spyGuess", { locationName: name });
       });
     });
     grid.appendChild(div);
@@ -295,14 +362,14 @@ function renderVotePlayers(players) {
     li.innerHTML = `<span class="pl-name">${esc(p.name)}</span><span class="pl-action">Обвинить →</span>`;
     li.addEventListener("click", () => {
       if (!p.connected) return;
-      showConfirm(`Начать голосование против «${p.name}»?`, "Обвинение", () => socket.emit("requestVote", { targetId: p.id }));
+      showConfirm(`Начать голосование против «${p.name}»?`, "Обвинение", () => emitAction("requestVote", { targetId: p.id }));
     });
     ul.appendChild(li);
   });
 }
 
 $("btn-end-round").addEventListener("click", () => {
-  showConfirm("Завершить раунд без результата?", "Завершение раунда", () => socket.emit("endRound"));
+  showConfirm("Завершить раунд без результата?", "Завершение раунда", () => emitAction("endRound"));
 });
 
 // ===== Таймер =====
@@ -331,10 +398,10 @@ function startTimer() {
   tick();
 }
 
-socket.on("timeUp", () => { toast("⏰ Время вышло! Пора голосовать."); });
+bindSocketEvent("timeUp", () => { toast("⏰ Время вышло! Пора голосовать."); });
 
 // ===== Голосование =====
-socket.on("voteUpdate", (v) => {
+bindSocketEvent("voteUpdate", (v) => {
   $("vote-overlay").hidden = false;
   $("vote-initiator").textContent = v.initiatorName || "?";
   $("vote-target").textContent = v.targetName || "?";
@@ -349,21 +416,21 @@ socket.on("voteUpdate", (v) => {
   else if (iVoted) { $("vote-waiting").hidden = false; $("vote-waiting").textContent = "Голос учтён. Ждём остальных…"; }
 });
 
-$("btn-vote-yes").addEventListener("click", () => { socket.emit("castVote", { vote: "yes" }); });
-$("btn-vote-no").addEventListener("click", () => { socket.emit("castVote", { vote: "no" }); });
+$("btn-vote-yes").addEventListener("click", () => { emitAction("castVote", { vote: "yes" }); });
+$("btn-vote-no").addEventListener("click", () => { emitAction("castVote", { vote: "no" }); });
 
-socket.on("voteResult", (r) => {
+bindSocketEvent("voteResult", (r) => {
   $("vote-overlay").hidden = true;
   if (r.passed) toast(r.isSpy ? `✅ ${r.targetName} — шпион!` : `❌ ${r.targetName} невиновен!`);
   else toast(`Голосование не прошло (${r.yesCount}/${r.yesCount + r.noCount}).`);
 });
 
-socket.on("spyGuessResult", (r) => {
+bindSocketEvent("spyGuessResult", (r) => {
   toast(r.correct ? `🕵️ ${r.spyName} угадал: ${r.actual}!` : `${r.spyName} не угадал. Это был не «${r.guess}».`);
 });
 
 // ===== Конец игры =====
-socket.on("gameEnded", (data) => {
+bindSocketEvent("gameEnded", (data) => {
   LOG.info("SOCKET", "gameEnded получен", { winner: data.winner, location: data.locationName, spy: data.spyName, reason: data.reason });
   cancelAnimationFrame(state.timerRAF);
   $("vote-overlay").hidden = true;
@@ -391,44 +458,74 @@ socket.on("gameEnded", (data) => {
 });
 
 $("btn-next-round").addEventListener("click", () => {
-  socket.emit("startGame", {
+  emitAction("startGame", {
     duration: parseInt($("input-duration").value, 10),
     setId: $("select-set").value,
   });
 });
 
 // ===== Ошибки =====
-socket.on("errorMsg", (msg) => {
+bindSocketEvent("errorMsg", (msg) => {
   LOG.warn("SOCKET", "errorMsg от сервера", msg);
   toast(msg);
 });
 
-// ===== Reconnect при загрузке =====
-socket.on("connect", () => {
-  state.myId = socket.id;
-  LOG.info("SOCKET", "Socket подключён", { socketId: socket.id });
+function tryResumeSession(force = false) {
   const savedRoom = localStorage.getItem("spy_room");
-  if (savedRoom && !state.code) {
-    LOG.info("RECONNECT", "Попытка восстановления сессии", { room: savedRoom, sessionId: sessionId.slice(0, 8) + "…" });
-    socket.emit("resume", { code: savedRoom, sessionId, name: savedName }, (res) => {
-      LOG.info("RECONNECT", "Ответ на resume", { ok: res?.ok, state: res?.state });
-      if (res && res.ok) {
-        state.code = res.code;
-        $("lobby-code").textContent = res.code;
-        if (res.state === "lobby") show("lobby");
-        // если playing — придёт roleAssigned и переключит на game
-      } else {
-        LOG.warn("RECONNECT", "Не удалось восстановить сессию — сброс savedRoom");
-        localStorage.removeItem("spy_room");
-      }
-    });
-  }
+  if (!savedRoom || resumeInFlight) return;
+
+  const now = Date.now();
+  if (!force && state.code === savedRoom && now - lastResumeAttemptAt < 2500) return;
+
+  resumeInFlight = true;
+  lastResumeAttemptAt = now;
+  LOG.info("RECONNECT", "Попытка восстановления сессии", { room: savedRoom, sessionId: sessionId.slice(0, 8) + "…" });
+  emitAction("resume", { code: savedRoom, sessionId, name: savedName || localStorage.getItem("spy_name") || "Игрок" }, (res) => {
+    resumeInFlight = false;
+    LOG.info("RECONNECT", "Ответ на resume", { ok: res?.ok, state: res?.state });
+    if (res && res.ok) {
+      state.code = res.code;
+      $("lobby-code").textContent = res.code;
+      if (res.state === "lobby") show("lobby");
+      // если playing — сервер повторно пришлёт roleAssigned и переключит на game
+    } else {
+      LOG.warn("RECONNECT", "Не удалось восстановить сессию — сброс savedRoom");
+      localStorage.removeItem("spy_room");
+      state.code = null;
+      show("home");
+    }
+  });
+}
+
+// ===== Reconnect при загрузке =====
+bindSocketEvent("connect", () => {
+  state.myId = socket.id;
+  setNetworkState(true);
+  LOG.info("SOCKET", "Socket подключён", { socketId: socket.id });
+  tryResumeSession(true);
 });
 
-socket.on("disconnect", (reason) => {
+bindSocketEvent("disconnect", (reason) => {
+  resumeInFlight = false;
+  setNetworkState(false, `Связь с сервером потеряна (${reason}). Восстанавливаем подключение…`);
   LOG.warn("SOCKET", "Socket отключён", { reason });
 });
 
-socket.on("connect_error", (err) => {
+bindSocketEvent("connect_error", (err) => {
+  resumeInFlight = false;
+  setNetworkState(false, "Не удаётся подключиться к серверу. Повторяем попытку…");
   LOG.error("SOCKET", "Ошибка подключения", err.message);
 });
+
+bindManagerEvent("reconnect_attempt", (attempt) => {
+  setNetworkState(false, `Переподключение к серверу… попытка ${attempt}`);
+  LOG.info("RECONNECT", "Попытка переподключения", { attempt });
+});
+
+bindManagerEvent("reconnect", (attempt) => {
+  setNetworkState(true);
+  LOG.info("RECONNECT", "Переподключение выполнено", { attempt });
+  tryResumeSession(true);
+});
+
+syncNetworkControls();

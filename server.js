@@ -12,11 +12,18 @@ const { Server } = require("socket.io");
 // ===== Система логирования (сервер) =====
 function log(tag, msg, data) {
   const ts = new Date().toISOString();
-  const d = data !== undefined ? JSON.stringify(data).slice(0, 500) : "";
-  console.log(`[${ts}] [${tag}] ${msg}`, d || "");
+  if (data !== undefined) {
+    console.log(`[${ts}] [${tag}] ${msg}`, JSON.stringify(data).slice(0, 500));
+  } else {
+    console.log(`[${ts}] [${tag}] ${msg}`);
+  }
 }
 function logErr(tag, msg, err) {
-  console.error(`[${new Date().toISOString()}] [${tag}] ${msg}`, err || "");
+  if (err !== undefined) {
+    console.error(`[${new Date().toISOString()}] [${tag}] ${msg}`, err);
+  } else {
+    console.error(`[${new Date().toISOString()}] [${tag}] ${msg}`);
+  }
 }
 
 // ===== Загрузка наборов локаций из data/locations =====
@@ -46,7 +53,14 @@ function getSet(setId) { return LOCATION_SETS[setId] || LOCATION_SETS.classic ||
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  pingInterval: 25000,
+  pingTimeout: 30000,
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000,
+    skipMiddlewares: true,
+  },
+});
 
 const PORT = process.env.PORT || 3000;
 const MAX_ROOMS = 50;
@@ -68,6 +82,9 @@ function rateLimited(socketId, action, max, windowMs) {
   s[action].push(now);
   return false;
 }
+function cleanupSocketLimit(socketId) {
+  socketLimits.delete(socketId);
+}
 
 app.use(express.json({ limit: "256kb" }));
 
@@ -84,6 +101,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/healthz", (req, res) => res.send("ok"));
+app.get("/favicon.ico", (req, res) => res.status(204).end());
 
 function countPlayers() {
   let players = 0;
@@ -351,6 +369,11 @@ io.on("connection", (socket) => {
     if (!room) return;
     currentRoom = code;
     const safeName = (name || "Игрок").toString().trim().slice(0, 20) || "Игрок";
+    const existingId = sessionId && Object.keys(room.players).find((id) => room.players[id].sessionId === sessionId);
+    if (existingId) {
+      doResume(room, existingId, safeName, sessionId);
+      return;
+    }
     room.players[socket.id] = { id: socket.id, name: safeName, connected: true, sessionId };
     if (!room.order.includes(socket.id)) room.order.push(socket.id);
     if (!room.hostId) room.hostId = socket.id;
@@ -362,6 +385,10 @@ io.on("connection", (socket) => {
 
   function doResume(room, oldId, name, sessionId) {
     currentRoom = room.code;
+    if (oldId !== socket.id && room.players[oldId]) {
+      const oldSocket = io.sockets.sockets.get(oldId);
+      if (oldSocket) oldSocket.leave(room.code);
+    }
     rekeyPlayer(room, oldId, socket.id);
     const p = room.players[socket.id];
     p.connected = true;
@@ -505,7 +532,8 @@ io.on("connection", (socket) => {
     currentRoom = null;
   }
 
-  socket.on("disconnect", () => {
+  socket.once("disconnect", () => {
+    cleanupSocketLimit(socket.id);
     const room = rooms[currentRoom];
     if (!room || !room.players[socket.id]) return;
     log("SOCKET", "Игрок отключился", { code: room.code, name: room.players[socket.id]?.name, socketId: socket.id.slice(0, 8) });

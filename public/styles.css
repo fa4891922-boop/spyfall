@@ -282,6 +282,24 @@ input[type="text"]:focus, .select:focus {
 .confirm-text { font-size: 16px; line-height: 1.5; margin-bottom: 20px; }
 .confirm-actions { display: flex; gap: 10px; }
 .confirm-actions .btn { flex: 1; }
+.btn:disabled,
+.select:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  filter: grayscale(.25);
+}
+
+.socket-status {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 70; max-width: min(92vw, 520px); padding: 10px 16px;
+  border-radius: 999px; border: 1px solid rgba(244, 199, 74, .45);
+  background: rgba(30, 24, 9, .94); color: var(--gold);
+  font-size: 13px; font-weight: 700; text-align: center; box-shadow: var(--shadow);
+}
+
+body.socket-offline .app {
+  pointer-events: auto;
+}
 
 /* ===== Тост ===== */
 .toast {
