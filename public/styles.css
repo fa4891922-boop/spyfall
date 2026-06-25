@@ -1,4 +1,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* Атрибут hidden должен побеждать display из классов (flex/grid перекрывают UA-правило). */
+[hidden] { display: none !important; }
 
 :root {
   --bg: #0b0e1a;
