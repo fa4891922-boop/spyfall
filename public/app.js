@@ -63,7 +63,7 @@ let resumeInFlight = false;
 let lastResumeAttemptAt = 0;
 const NETWORK_ACTION_IDS = [
   "btn-create", "btn-join", "select-set", "btn-start", "btn-end-round",
-  "btn-vote-yes", "btn-vote-no", "btn-next-round", "btn-confirm-yes",
+  "btn-vote-yes", "btn-vote-no", "btn-next-round",
 ];
 
 function bindSocketEvent(event, handler) {
@@ -92,10 +92,6 @@ function syncNetworkControls() {
   NETWORK_ACTION_IDS.forEach((id) => {
     const el = $(id);
     if (!el) return;
-    if (id === "btn-confirm-yes") {
-      el.disabled = !state.isConnected || $("confirm-overlay")?.hidden || !_confirmCb;
-      return;
-    }
     el.disabled = !state.isConnected;
   });
 }
@@ -131,42 +127,12 @@ function toast(msg, ms = 2600) {
   t._timer = setTimeout(() => { t.hidden = true; }, ms);
 }
 
-// ===== Модальное подтверждение (вместо confirm) =====
-let _confirmCb = null;
+// ===== Прямое выполнение действия (модальное подтверждение убрано) =====
+// Сигнатура сохранена ради совместимости: showConfirm(text, title, onYes) или showConfirm(text, onYes).
 function showConfirm(text, title, onYes) {
-  // Поддержка старой сигнатуры showConfirm(text, onYes) — без title
-  if (typeof title === "function") { onYes = title; title = "Подтверждение"; }
-  if (!title) title = "Подтверждение";
-
-  LOG.info("CONFIRM", "Открытие модального окна", { title, text: text?.slice(0, 80) });
-
-  if (!LOG.assert(text, "CONFIRM", "confirm text")) {
-    LOG.error("CONFIRM", "showConfirm вызван с пустым текстом — показываю резервный заголовок");
-    text = "Вы уверены?";
-  }
-
-  $("confirm-title").textContent = title;
-  $("confirm-text").textContent = text;
-  $("btn-confirm-yes").disabled = !text || !onYes || !state.isConnected;
-  $("confirm-overlay").hidden = false;
-  _confirmCb = onYes;
+  if (typeof title === "function") { onYes = title; }
+  if (typeof onYes === "function") onYes();
 }
-$("btn-confirm-yes").addEventListener("click", () => {
-  if ($("confirm-overlay").hidden || $("btn-confirm-yes").disabled) return;
-  LOG.info("CONFIRM", "Пользователь нажал Подтвердить");
-  $("confirm-overlay").hidden = true;
-  if (_confirmCb) {
-    const cb = _confirmCb;
-    _confirmCb = null;
-    cb();
-  }
-});
-$("btn-confirm-no").addEventListener("click", () => {
-  if ($("confirm-overlay").hidden) return;
-  LOG.info("CONFIRM", "Пользователь нажал Отмена");
-  $("confirm-overlay").hidden = true;
-  _confirmCb = null;
-});
 
 // ===== Главный экран =====
 $("input-name").value = savedName;

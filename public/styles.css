@@ -267,21 +267,7 @@ input[type="text"]:focus, .select:focus {
 .leaderboard .lb-meta { font-size: 12px; color: var(--muted); }
 .leaderboard .lb-score { font-family: "Oswald", sans-serif; font-size: 20px; color: var(--accent-2); }
 
-/* ===== Модальное подтверждение ===== */
-.confirm-overlay {
-  position: fixed; inset: 0; background: rgba(7,9,18,.8); backdrop-filter: blur(6px);
-  display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 55;
-  animation: fade .25s ease;
-}
-.confirm-modal {
-  background: linear-gradient(180deg, var(--card), var(--card-2));
-  border: 1px solid var(--line); border-radius: var(--radius); padding: 26px;
-  width: 100%; max-width: 360px; box-shadow: var(--shadow); text-align: center;
-}
-.confirm-modal .eyebrow { display: block; margin-bottom: 12px; }
-.confirm-text { font-size: 16px; line-height: 1.5; margin-bottom: 20px; }
-.confirm-actions { display: flex; gap: 10px; }
-.confirm-actions .btn { flex: 1; }
+/* ===== Отключённые элементы ===== */
 .btn:disabled,
 .select:disabled {
   opacity: .5;
